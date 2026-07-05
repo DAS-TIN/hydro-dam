@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use Hydrodam in your work, please cite it as below."
+title: Hydrodam
+abstract: >-
+  A safer git desktop client built on the real git CLI, with identity
+  profiles, co-author management, full commit and push previews, and a
+  pre-commit guard that catches out-of-band changes before a commit lands.
+type: software
+authors:
+  - given-names: Dastin
+    family-names: Depta
+version: 0.1.0
+date-released: "2026-07-05"
+license: Apache-2.0
+repository-code: "https://github.com/DAS-TIN/hydro-dam"
+url: "https://github.com/DAS-TIN/hydro-dam"
+keywords:
+  - git
+  - electron
+  - developer-tools
+  - version-control

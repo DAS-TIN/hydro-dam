@@ -1,0 +1,191 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  /* Accent colour as space-separated RGB so Tailwind alpha utilities work. */
+  --accent: 123 149 255;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #080a10;
+  color: #e8eaf2;
+  /* Calibri for all UI chrome; code, diffs and hashes stay JetBrains Mono. */
+  font-family: Calibri, 'Segoe UI', system-ui, sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* Sleek thin scrollbars */
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #283045;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #384157;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium
+      transition-colors duration-100 disabled:opacity-40 disabled:pointer-events-none select-none;
+  }
+  .btn-ghost {
+    @apply btn text-slate-300 hover:bg-ink-750 hover:text-white;
+  }
+  .btn-soft {
+    @apply btn bg-ink-750 text-slate-200 hover:bg-ink-700;
+  }
+  .btn-accent {
+    @apply btn text-white hover:brightness-110 shadow-lg shadow-accent/30;
+    background-image: linear-gradient(180deg, rgb(var(--accent) / 1), rgb(var(--accent) / 0.78));
+    border: 1px solid rgb(var(--accent) / 0.55);
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold;
+  }
+  .card {
+    @apply rounded-xl border border-ink-700/60 bg-ink-850;
+  }
+}
+
+/* Diff colouring */
+.diff-line {
+  white-space: pre;
+  padding: 0 12px;
+  font-variant-ligatures: none;
+}
+.diff-add {
+  background: rgba(74, 222, 128, 0.1);
+  color: #b9f6cd;
+}
+.diff-del {
+  background: rgba(248, 113, 113, 0.1);
+  color: #ffc9c9;
+}
+.diff-hunk {
+  color: #7aa2f7;
+  background: rgba(109, 139, 255, 0.06);
+}
+.diff-meta {
+  color: #6b7280;
+}
+
+/* Syntax highlighting tokens (CodeView + markdown code fences) */
+.tok-kw {
+  color: #7aa2f7;
+}
+.tok-str {
+  color: #95d0a5;
+}
+.tok-com {
+  color: #5b6480;
+  font-style: italic;
+}
+.tok-num {
+  color: #f0b464;
+}
+.tok-fn {
+  color: #c8b3f5;
+}
+.tok-type {
+  color: #5cd3e0;
+}
+
+/* design polish */
+
+/* Tabular figures so hashes, +/- counts and ahead/behind columns line up. */
+.font-mono,
+code {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Keyboard focus that matches the accent, app-wide. */
+button:focus-visible,
+a:focus-visible,
+[role='button']:focus-visible {
+  outline: 2px solid rgb(var(--accent) / 0.7);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Welcome wordmark + CLI-style caret: the one signature flourish. */
+.wordmark {
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+.caret {
+  display: inline-block;
+  width: 0.46ch;
+  height: 0.9em;
+  margin-left: 0.14em;
+  background: rgb(var(--accent));
+  border-radius: 1px;
+  transform: translateY(0.06em);
+  animation: caret-blink 1.15s steps(1, end) infinite;
+}
+@keyframes caret-blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  50.01%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Welcome backdrop: a faint, accent-tinted grid that fades into the dark. */
+.welcome-bg {
+  position: relative;
+  background:
+    radial-gradient(60rem 38rem at 50% -8%, rgb(var(--accent) / 0.1), transparent 60%),
+    #080a10;
+}
+.welcome-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 34px 34px;
+  -webkit-mask-image: radial-gradient(46rem 28rem at 50% 32%, #000, transparent 72%);
+  mask-image: radial-gradient(46rem 28rem at 50% 32%, #000, transparent 72%);
+  pointer-events: none;
+}
+
+@keyframes hd-bar {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caret {
+    animation: none;
+    opacity: 1;
+  }
+}
