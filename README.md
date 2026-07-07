@@ -69,6 +69,19 @@ Requirements: Node 20+ and `git` on your PATH. Optional integrations use `git-lf
 
 ---
 
+## Keyboard driving
+
+The whole loop works without a mouse. Press **Tab** and a hint strip appears showing where the focus is and which keys work there.
+
+- **Tab** cycles the panels: sidebar, file list, main view, commit box, top bar. Arrows move inside a panel.
+- Single letters are contextual and never fire while you type. With the file list focused: **s** stages or unstages, **a** stages everything, **Enter** opens the diff, **c** jumps to the commit message. In the diff: **d / f / p** switch views, **b** blame, **h** history, **t** flips unified/split.
+- **Ctrl+Enter** commits, **Ctrl+P** pushes, **Ctrl+Shift+L** pulls, **Ctrl+F** fetches. These live in the app menu too.
+- **z** and **Shift+Z** undo and redo staging operations. The status bar keeps the log.
+- **Ctrl+Tab** locks Tab inside the focused panel. **Ctrl+Shift+Tab** opens ultra focus, where one view takes the whole window (repo actions, file list, graph, or commit) with a dock at the bottom; **Shift+Left/Right** hop between them and **Esc** backs out.
+- **?** opens the full cheat sheet.
+
+---
+
 ## How it compares
 
 Legend: **Yes** = built in, **Limited** = partial, manual, or paid, **No** = not available
