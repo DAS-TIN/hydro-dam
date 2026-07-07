@@ -71,9 +71,11 @@ export function PromptHost() {
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault()
+                e.stopPropagation()
                 submit()
               } else if (e.key === 'Escape') {
                 e.preventDefault()
+                e.stopPropagation()
                 finish(null)
               }
             }}

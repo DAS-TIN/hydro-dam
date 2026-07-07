@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { api, CommitPreview as Preview } from '../api'
+import DiffView from './DiffView'
 import { IconClose } from "./Icons"
 
 function statusColor(s: string): string {
@@ -29,6 +30,25 @@ export default function CommitPreview({
   const [data, setData] = useState<Preview | null>(null)
   const [lastCommit, setLastCommit] = useState('')
   const [loading, setLoading] = useState(true)
+  const [openPath, setOpenPath] = useState<string | null>(null)
+  const [diffs, setDiffs] = useState<Record<string, string>>({})
+
+  const loadDiff = (path: string) => {
+    setDiffs((d) => (path in d ? d : { ...d, [path]: '' }))
+    api()
+      .fileDiff(cwd, path, true, false)
+      .then((t) => setDiffs((d) => ({ ...d, [path]: t })))
+      .catch((e) => setDiffs((d) => ({ ...d, [path]: e.message })))
+  }
+
+  const toggleDiff = (path: string) => {
+    if (openPath === path) {
+      setOpenPath(null)
+      return
+    }
+    setOpenPath(path)
+    loadDiff(path)
+  }
 
   const reload = () => {
     setLoading(true)
@@ -36,6 +56,12 @@ export default function CommitPreview({
       .then(([p, l]) => {
         setData(p)
         setLastCommit(l)
+        // Show the changed lines straight away, not just the counts.
+        const first = p.files[0]?.path
+        if (first) {
+          setOpenPath(first)
+          loadDiff(first)
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -81,17 +107,32 @@ export default function CommitPreview({
                   Nothing staged. Stage files first, then commit.
                 </div>
               ) : (
-                <ul className="mb-4 max-h-44 overflow-auto rounded-lg border border-ink-800 bg-ink-900">
+                <ul className="mb-4 max-h-80 overflow-auto rounded-lg border border-ink-800 bg-ink-900">
                   {files.map((f) => (
-                    <li
-                      key={f.path}
-                      className="flex items-center gap-2 border-b border-ink-850 px-3 py-1.5 text-sm last:border-0"
-                    >
-                      <span className={`w-4 font-bold ${statusColor(f.status)}`}>{f.status}</span>
-                      <span className="min-w-0 flex-1 truncate text-slate-200">{f.path}</span>
-                      <span className="font-mono text-[11px] text-slate-500">
-                        {f.add < 0 ? 'bin' : <><span className="text-good">+{f.add}</span> <span className="text-bad">-{f.del}</span></>}
-                      </span>
+                    <li key={f.path} className="border-b border-ink-850 last:border-0">
+                      <button
+                        onClick={() => toggleDiff(f.path)}
+                        title={openPath === f.path ? 'Hide the changed lines' : 'Show the changed lines'}
+                        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-ink-850"
+                      >
+                        <span className="w-3 text-[10px] text-slate-600">
+                          {openPath === f.path ? 'v' : '>'}
+                        </span>
+                        <span className={`w-4 font-bold ${statusColor(f.status)}`}>{f.status}</span>
+                        <span className="min-w-0 flex-1 truncate text-slate-200">{f.path}</span>
+                        <span className="font-mono text-[11px] text-slate-500">
+                          {f.add < 0 ? 'bin' : <><span className="text-good">+{f.add}</span> <span className="text-bad">-{f.del}</span></>}
+                        </span>
+                      </button>
+                      {openPath === f.path && (
+                        <div className="max-h-56 overflow-auto border-t border-ink-850 bg-ink-950">
+                          {diffs[f.path] === '' ? (
+                            <div className="px-3 py-2 text-xs text-slate-500">Loading diff...</div>
+                          ) : (
+                            <DiffView text={diffs[f.path] ?? ''} empty="Binary file or no textual diff." />
+                          )}
+                        </div>
+                      )}
                     </li>
                   ))}
                 </ul>

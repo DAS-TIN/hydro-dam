@@ -768,7 +768,11 @@ export interface HydrodamApi {
   logStat(cwd: string, count: number): Promise<string>
   mcpStatus(): Promise<McpInfo>
   mcpSetRepo(cwd: string | null): Promise<boolean>
-  onMenu(cb: (action: 'new-repo' | 'open-repo' | 'settings' | 'stash') => void): () => void
+  onMenu(
+    cb: (
+      action: 'new-repo' | 'open-repo' | 'settings' | 'stash' | 'commit' | 'push' | 'pull' | 'fetch'
+    ) => void
+  ): () => void
 }
 
 declare global {

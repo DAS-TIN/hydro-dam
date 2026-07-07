@@ -200,7 +200,15 @@ function createWindow(): BrowserWindow {
   return win
 }
 
-type MenuAction = 'new-repo' | 'open-repo' | 'settings' | 'stash'
+type MenuAction =
+  | 'new-repo'
+  | 'open-repo'
+  | 'settings'
+  | 'stash'
+  | 'commit'
+  | 'push'
+  | 'pull'
+  | 'fetch'
 
 // Tell the focused renderer to run a menu-driven navigation action.
 function sendMenu(action: MenuAction) {
@@ -239,6 +247,27 @@ function buildMenu(): void {
     {
       label: 'Repository',
       submenu: [
+        {
+          label: 'Commit',
+          accelerator: 'CmdOrCtrl+Enter',
+          click: () => sendMenu('commit')
+        },
+        {
+          label: 'Push',
+          accelerator: 'CmdOrCtrl+P',
+          click: () => sendMenu('push')
+        },
+        {
+          label: 'Pull',
+          accelerator: 'CmdOrCtrl+Shift+L',
+          click: () => sendMenu('pull')
+        },
+        {
+          label: 'Fetch',
+          accelerator: 'CmdOrCtrl+F',
+          click: () => sendMenu('fetch')
+        },
+        { type: 'separator' },
         {
           label: 'Stashes...',
           accelerator: 'CmdOrCtrl+Shift+S',

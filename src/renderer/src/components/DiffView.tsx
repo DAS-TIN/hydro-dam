@@ -191,6 +191,8 @@ export default function DiffView({ text, empty }: { text: string; empty?: string
           {(['unified', 'split'] as const).map((m) => (
             <button
               key={m}
+              data-diff-mode={m} // the `t` shortcut finds and clicks the inactive one
+              data-active={mode === m}
               onClick={() => setMode(m)}
               className={`rounded px-2 py-0.5 text-[11px] font-medium ${
                 mode === m ? 'bg-ink-750 text-white' : 'text-slate-400 hover:text-slate-200'

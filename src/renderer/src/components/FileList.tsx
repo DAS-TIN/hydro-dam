@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { FileEntry, NumstatEntry, RepoStatus, WorkingNumstat, basename, dirname } from '../api'
 import { IconBlocked, IconCheck, IconChevronDown, IconChevronRight, IconArrowLeft } from './Icons'
 
@@ -73,6 +73,7 @@ function Row({
   return (
     <div
       onClick={onSelect}
+      data-selected={selected || undefined}
       style={{ paddingLeft: 12 + indent * 14 }}
       title={`${f.path} (${b.label})`}
       className={`group flex cursor-pointer items-center gap-2 py-1.5 pr-3 text-sm transition-colors ${
@@ -224,6 +225,12 @@ export default function FileList(props: Props) {
   const { status, stats, hidden, selected, treeView, showIgnored } = props
   const tracked = status.files.filter((f) => !f.ignored)
 
+  // Keep the row visible when selection moves by keyboard.
+  const boxRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    boxRef.current?.querySelector('[data-selected]')?.scrollIntoView({ block: 'nearest' })
+  }, [selected])
+
   const stagedStats = useMemo(
     () => new Map((stats?.staged ?? []).map((e) => [e.path, e])),
     [stats]
@@ -363,7 +370,7 @@ export default function FileList(props: Props) {
   )
 
   return (
-    <div className="flex-1 overflow-auto">
+    <div ref={boxRef} className="flex-1 overflow-auto">
       <Section title="Conflicts" count={conflicts.length} accent="bg-bad">
         {body(conflicts, conflictLeaf)}
       </Section>

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { FileEntry, basename } from '../api'
 import { IconChevronDown, IconChevronRight, IconFolder, IconFolderOpen } from './Icons'
 
@@ -53,6 +53,12 @@ export default function RepoTree({
   const root = useMemo(() => build(paths), [paths])
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
 
+  // keep the keyboard selection on screen
+  const boxRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    boxRef.current?.querySelector('[data-selected]')?.scrollIntoView({ block: 'nearest' })
+  }, [selected])
+
   const toggle = (path: string) =>
     setCollapsed((s) => {
       const n = new Set(s)
@@ -90,6 +96,8 @@ export default function RepoTree({
         out.push(
           <div
             key={k.path}
+            data-tree-path={k.path}
+            data-selected={isSel || undefined}
             onClick={() => onSelect(k.path)}
             style={{ paddingLeft: pad }}
             title={`${k.path}${f ? ` (${b.title})` : ''}`}
@@ -120,5 +128,5 @@ export default function RepoTree({
     )
   }
 
-  return <div className="flex-1 overflow-auto py-1">{render(root, 0)}</div>
+  return <div ref={boxRef} className="flex-1 overflow-auto py-1">{render(root, 0)}</div>
 }

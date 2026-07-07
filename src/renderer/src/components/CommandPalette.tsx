@@ -148,6 +148,8 @@ export default function CommandPalette({
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => {
+            // handled here; keep them away from the app-level key dispatcher
+            if (['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(e.key)) e.stopPropagation()
             if (e.key === 'ArrowDown') {
               e.preventDefault()
               setIdx((i) => Math.min(i + 1, results.length - 1))

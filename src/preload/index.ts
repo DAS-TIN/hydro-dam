@@ -273,8 +273,12 @@ const api = {
   mcpStatus: () => call<any>('mcp:status'),
   mcpSetRepo: (cwd: string | null) => call<boolean>('mcp:setRepo', cwd),
 
-  // menu-driven navigation from the native File menu
-  onMenu: (cb: (action: 'new-repo' | 'open-repo' | 'settings' | 'stash') => void) => {
+  // menu-driven actions from the native application menu
+  onMenu: (
+    cb: (
+      action: 'new-repo' | 'open-repo' | 'settings' | 'stash' | 'commit' | 'push' | 'pull' | 'fetch'
+    ) => void
+  ) => {
     const listener = (_e: unknown, action: any) => cb(action)
     ipcRenderer.on('menu', listener)
     return () => ipcRenderer.removeListener('menu', listener)
