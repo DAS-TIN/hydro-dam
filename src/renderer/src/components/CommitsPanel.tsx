@@ -467,8 +467,13 @@ export default function CommitsPanel({
         </div>
 
         <div className="flex min-h-0 flex-1">
-          {/* graph + list */}
-          <div ref={listRef} className="relative shrink-0 overflow-auto" style={{ width: listW }}>
+          {/* graph + list. maxWidth keeps the detail pane (and its
+              Unified/Split controls) visible on narrow windows. */}
+          <div
+            ref={listRef}
+            className="relative shrink-0 overflow-auto"
+            style={{ width: listW, maxWidth: '55%' }}
+          >
             {loadingList && <div className="p-4 text-sm text-slate-500">Loading...</div>}
             {!loadingList && commits.length === 0 && (
               <div className="p-4 text-sm text-slate-500">No commits match.</div>

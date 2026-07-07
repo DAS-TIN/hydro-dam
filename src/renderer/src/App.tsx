@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   api,
   confirmDialog,
@@ -37,45 +37,64 @@ import {
   IconLogo,
   IconHelp
 } from './components/Icons'
-import CoauthorPanel from './components/CoauthorPanel'
-import CoauthorGuard from './components/CoauthorGuard'
 import { PromptHost, promptDialog } from './components/PromptModal'
-import PushPreview from './components/PushPreview'
-import HistoryPanel from './components/HistoryPanel'
 import CommitsPanel from './components/CommitsPanel'
-import BranchesPanel from './components/BranchesPanel'
-import RemotePanel from './components/RemotePanel'
-import BlamePanel from './components/BlamePanel'
-import ConnectionsPanel from './components/ConnectionsPanel'
 import HunkStager from './components/HunkStager'
-import InteractiveRebasePanel from './components/InteractiveRebasePanel'
-import ReflogPanel from './components/ReflogPanel'
-import LFSPanel from './components/LFSPanel'
 import ImageDiff from './components/ImageDiff'
-import TrackersPanel from './components/TrackersPanel'
-import TrelloBoardView from './components/TrelloBoardView'
-import SecurityPanel from './components/SecurityPanel'
-import WorkspacesPanel from './components/WorkspacesPanel'
-import InsightsPanel from './components/InsightsPanel'
-import SetupsPanel from './components/SetupsPanel'
-import AiResultModal from './components/AiResultModal'
-import CommitComposerModal from './components/CommitComposerModal'
-import WorktreesPanel from './components/WorktreesPanel'
-import IssuesPanel from './components/IssuesPanel'
-import SettingsPanel from './components/SettingsPanel'
-import StashPanel from './components/StashPanel'
-import ExcludePanel from './components/ExcludePanel'
-import CommitPreview from './components/CommitPreview'
-import CommitGuard from './components/CommitGuard'
-import IdentityPanel from './components/IdentityPanel'
-import ConflictPanel from './components/ConflictPanel'
-import NewRepoPanel from './components/NewRepoPanel'
 import Legend from './components/Legend'
 import CommandPalette, { PaletteAction } from './components/CommandPalette'
-import SubmodulesPanel from './components/SubmodulesPanel'
-import HelpPanel from './components/HelpPanel'
-import DiscardsPanel from './components/DiscardsPanel'
-import IgnoredDialog from './components/IgnoredDialog'
+import ShortcutSheet from './components/ShortcutSheet'
+import UltraDock, { ULTRA_ORDER } from './components/UltraDock'
+import {
+  Region,
+  REGION_LABELS,
+  SHORTCUTS,
+  comboOf,
+  findShortcut,
+  focusables,
+  isTextTarget,
+  moveFocusWithin
+} from './shortcuts'
+
+// Dialog panels load on first open; none of them are needed to paint the
+// main window and together they were most of the bundle.
+const CoauthorPanel = lazy(() => import('./components/CoauthorPanel'))
+const CoauthorGuard = lazy(() => import('./components/CoauthorGuard'))
+const PushPreview = lazy(() => import('./components/PushPreview'))
+const HistoryPanel = lazy(() => import('./components/HistoryPanel'))
+const BranchesPanel = lazy(() => import('./components/BranchesPanel'))
+const RemotePanel = lazy(() => import('./components/RemotePanel'))
+const BlamePanel = lazy(() => import('./components/BlamePanel'))
+const ConnectionsPanel = lazy(() => import('./components/ConnectionsPanel'))
+const InteractiveRebasePanel = lazy(() => import('./components/InteractiveRebasePanel'))
+const ReflogPanel = lazy(() => import('./components/ReflogPanel'))
+const LFSPanel = lazy(() => import('./components/LFSPanel'))
+const TrackersPanel = lazy(() => import('./components/TrackersPanel'))
+const TrelloBoardView = lazy(() => import('./components/TrelloBoardView'))
+const SecurityPanel = lazy(() => import('./components/SecurityPanel'))
+const WorkspacesPanel = lazy(() => import('./components/WorkspacesPanel'))
+const InsightsPanel = lazy(() => import('./components/InsightsPanel'))
+const SetupsPanel = lazy(() => import('./components/SetupsPanel'))
+const AiResultModal = lazy(() => import('./components/AiResultModal'))
+const CommitComposerModal = lazy(() => import('./components/CommitComposerModal'))
+const WorktreesPanel = lazy(() => import('./components/WorktreesPanel'))
+const IssuesPanel = lazy(() => import('./components/IssuesPanel'))
+const SettingsPanel = lazy(() => import('./components/SettingsPanel'))
+const StashPanel = lazy(() => import('./components/StashPanel'))
+const ExcludePanel = lazy(() => import('./components/ExcludePanel'))
+const CommitPreview = lazy(() => import('./components/CommitPreview'))
+const CommitGuard = lazy(() => import('./components/CommitGuard'))
+const IdentityPanel = lazy(() => import('./components/IdentityPanel'))
+const ConflictPanel = lazy(() => import('./components/ConflictPanel'))
+const NewRepoPanel = lazy(() => import('./components/NewRepoPanel'))
+const SubmodulesPanel = lazy(() => import('./components/SubmodulesPanel'))
+const HelpPanel = lazy(() => import('./components/HelpPanel'))
+const DiscardsPanel = lazy(() => import('./components/DiscardsPanel'))
+const IgnoredDialog = lazy(() => import('./components/IgnoredDialog'))
+const UltraCommit = lazy(() => import('./components/UltraCommit'))
+const UltraTop = lazy(() => import('./components/UltraTop'))
+const UltraFiles = lazy(() => import('./components/UltraFiles'))
+const UltraGraph = lazy(() => import('./components/UltraGraph'))
 
 type Toast = { id: number; kind: 'ok' | 'err' | 'info'; text: string }
 
@@ -95,6 +114,21 @@ function changedPaths(prev: RepoStatus | null, next: RepoStatus): string[] {
 }
 
 const IMAGE_RE = /\.(png|jpe?g|gif|webp|bmp|ico)$/i
+
+// Tab walks the regions in this order; the first Tab always lands on the rail.
+const REGION_ORDER: Region[] = ['rail', 'files', 'main', 'commit', 'topbar']
+
+// Focus marker for a region. Its own overlay element rather than an outline or
+// ring on the container: sticky headers and z-indexed children inside the
+// panels paint over both of those, but not over a sibling drawn at z-30.
+function FocusHalo({ on }: { on: boolean }) {
+  if (!on) return null
+  return <div className="pointer-events-none absolute inset-0 z-30 border-2 border-accent" />
+}
+
+// One in-app undoable operation (stage, unstage, hide...). Git itself is the
+// source of truth; undo/redo just replay the inverse command.
+type UndoOp = { label: string; undo: () => Promise<unknown>; redo: () => Promise<unknown> }
 
 const DEFAULT_SETTINGS: Settings = {
   showLegend: true,
@@ -196,6 +230,23 @@ export default function App() {
   const [showHelp, setShowHelp] = useState(false)
   const [showDiscards, setShowDiscards] = useState(false)
   const [showPalette, setShowPalette] = useState(false)
+  // Keyboard focus region. kbNav means the user is steering by keyboard right
+  // now; the focus rings only show then, so mouse users never see them.
+  const [focusRegion, setFocusRegion] = useState<Region>('files')
+  const [kbNav, setKbNav] = useState(false)
+  const [focusLock, setFocusLock] = useState(false)
+  // ultra focus (Ctrl+Shift+Tab): one view takes the whole window
+  const [ultra, setUltra] = useState<Region | null>(null)
+  const [showCheats, setShowCheats] = useState(false)
+  const [undoStack, setUndoStack] = useState<UndoOp[]>([])
+  const [redoStack, setRedoStack] = useState<UndoOp[]>([])
+  const [undoMenu, setUndoMenu] = useState(false)
+  const topRef = useRef<HTMLDivElement | null>(null)
+  const railRef = useRef<HTMLElement | null>(null)
+  const filesRef = useRef<HTMLDivElement | null>(null)
+  const mainRef = useRef<HTMLDivElement | null>(null)
+  const commitZoneRef = useRef<HTMLDivElement | null>(null)
+  const commitRef = useRef<HTMLTextAreaElement | null>(null)
   const [leftW, setLeftW] = useState(300)
   const [commitW, setCommitW] = useState(272)
   const [mcp, setMcp] = useState<McpInfo | null>(null)
@@ -343,18 +394,6 @@ export default function App() {
     refresh(root)
   }
 
-  // Ctrl+P / Ctrl+K opens the command palette once a repo is open.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'k')) {
-        e.preventDefault()
-        if (cwd) setShowPalette(true)
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [cwd])
-
   // Poll for external changes while a repo is open. Pause during review / guard
   // so the baseline fingerprint stays frozen at what the user is looking at.
   useEffect(() => {
@@ -374,6 +413,10 @@ export default function App() {
     return () => window.removeEventListener('focus', onFocus)
   }, [cwd, refresh, showReview, guard])
 
+  // Debounced so holding an arrow key fires one fetch, not one per row. The
+  // seq counter drops stale replies and the old diff stays up while the next
+  // renders, otherwise cycling the list flashes and stutters.
+  const diffSeq = useRef(0)
   useEffect(() => {
     if (!cwd || !sel) {
       setDiff('')
@@ -381,11 +424,21 @@ export default function App() {
       return
     }
     const { file, staged } = sel
-    api()
-      .fileDiff(cwd, file.path, staged, file.untracked)
-      .then(setDiff)
-      .catch((e) => setDiff(e.message))
-    api().fileMeta(cwd, file.path).then(setMeta).catch(() => setMeta({}))
+    const seq = ++diffSeq.current
+    const t = setTimeout(() => {
+      api()
+        .fileDiff(cwd, file.path, staged, file.untracked)
+        .then((d) => {
+          if (seq !== diffSeq.current) return
+          React.startTransition(() => setDiff(d))
+        })
+        .catch((e) => seq === diffSeq.current && setDiff(e.message))
+      api()
+        .fileMeta(cwd, file.path)
+        .then((m) => seq === diffSeq.current && setMeta(m))
+        .catch(() => {})
+    }, 120)
+    return () => clearTimeout(t)
   }, [cwd, sel, status])
 
   function selectFile(file: FileEntry, staged: boolean) {
@@ -537,6 +590,86 @@ export default function App() {
     }
   }
 
+  // Shared by the file-list hover button and the Ctrl+D shortcut.
+  async function discardFile(f: FileEntry) {
+    if (!cwd) return
+    const ok = await confirmDialog({
+      title: f.untracked ? 'Delete untracked file' : 'Discard changes',
+      danger: true,
+      message: f.untracked
+        ? `Delete untracked file ${basename(f.path)} from disk?`
+        : `Discard changes to ${basename(f.path)}?`,
+      detail: f.untracked
+        ? 'This is permanent.'
+        : 'It will be reverted to the last commit. This cannot be undone.',
+      confirmLabel: f.untracked ? 'Delete' : 'Discard',
+      cancelLabel: 'Cancel'
+    })
+    if (ok) run(() => A.discard(cwd, f.path, f.untracked).then(() => refresh()))
+  }
+
+  // In-app undo/redo journal (z / Shift+Z, log in the status bar). Only ops
+  // with a safe inverse are recorded: staging, unstaging, hide/unhide.
+  const pushOp = (op: UndoOp) => {
+    setUndoStack((s) => [...s.slice(-19), op]) // keep the last 20
+    setRedoStack([])
+  }
+
+  const fileWord = (paths: string[]) =>
+    paths.length === 1 ? basename(paths[0]) : `${paths.length} files`
+
+  function stagePaths(paths: string[]) {
+    if (!cwd || paths.length === 0) return
+    run(() => A.stage(cwd, paths).then(() => refresh()))
+    pushOp({
+      label: `Stage ${fileWord(paths)}`,
+      undo: () => A.unstage(cwd, paths).then(() => refresh()),
+      redo: () => A.stage(cwd, paths).then(() => refresh())
+    })
+  }
+
+  function unstagePaths(paths: string[]) {
+    if (!cwd || paths.length === 0) return
+    run(() => A.unstage(cwd, paths).then(() => refresh()))
+    pushOp({
+      label: `Unstage ${fileWord(paths)}`,
+      undo: () => A.stage(cwd, paths).then(() => refresh()),
+      redo: () => A.unstage(cwd, paths).then(() => refresh())
+    })
+  }
+
+  function hidePath(path: string, hide: boolean) {
+    if (!cwd) return
+    run(() => A.hide(cwd, path, hide).then(() => refresh()), hide ? 'Hidden from commits.' : 'Unhidden.')
+    pushOp({
+      label: `${hide ? 'Hide' : 'Unhide'} ${basename(path)}`,
+      undo: () => A.hide(cwd, path, !hide).then(() => refresh()),
+      redo: () => A.hide(cwd, path, hide).then(() => refresh())
+    })
+  }
+
+  const doUndoOp = () => {
+    const op = undoStack[undoStack.length - 1]
+    if (!op) {
+      toast('info', 'Nothing to undo.')
+      return
+    }
+    setUndoStack((s) => s.slice(0, -1))
+    setRedoStack((s) => [...s, op])
+    run(() => op.undo(), `Undone: ${op.label}`)
+  }
+
+  const doRedoOp = () => {
+    const op = redoStack[redoStack.length - 1]
+    if (!op) {
+      toast('info', 'Nothing to redo.')
+      return
+    }
+    setRedoStack((s) => s.slice(0, -1))
+    setUndoStack((s) => [...s, op])
+    run(() => op.redo(), `Redone: ${op.label}`)
+  }
+
   const stagedCount = status?.files.filter((f) => f.staged && !f.conflicted).length ?? 0
   const conflictCount = status?.files.filter((f) => f.conflicted).length ?? 0
   const activeCo = coauthors.filter((c) => c.enabled)
@@ -628,13 +761,457 @@ export default function App() {
 
   const doNew = () => setNewRepo({ initPath: null })
 
+  // Keyboard-first navigation (docs/keyboard-shortcuts.md): one window-level
+  // dispatcher, contextual single keys, Tab-cycled focus regions. The binding
+  // table lives in shortcuts.ts and the "?" sheet renders the same table.
+
+  // Files in the order FileList draws its sections, for arrow-key selection.
+  const orderedFiles = useMemo(() => {
+    const tracked = (status?.files ?? []).filter((f) => !f.ignored)
+    return [
+      ...tracked.filter((f) => f.conflicted).map((file) => ({ file, staged: false })),
+      ...tracked.filter((f) => f.staged && !f.conflicted).map((file) => ({ file, staged: true })),
+      ...tracked.filter((f) => f.unstaged && !f.conflicted).map((file) => ({ file, staged: false })),
+      ...tracked.filter((f) => f.untracked).map((file) => ({ file, staged: false }))
+    ]
+  }, [status])
+
+  const moveSelection = (dir: 1 | -1) => {
+    if (orderedFiles.length === 0) return
+    const at = orderedFiles.findIndex((e) => e.file.path + (e.staged ? ':staged' : '') === selKey)
+    const next =
+      at === -1
+        ? dir === 1
+          ? 0
+          : orderedFiles.length - 1
+        : Math.min(Math.max(at + dir, 0), orderedFiles.length - 1)
+    selectFile(orderedFiles[next].file, orderedFiles[next].staged)
+  }
+
+  const toggleStage = () => {
+    if (!cwd || !sel) return
+    const { file, staged } = sel
+    if (staged) unstagePaths([file.path])
+    else stagePaths([file.path])
+    // Follow the file into its new section so the next toggle flips it back.
+    setSel({ file, staged: !staged })
+  }
+
+  // Ctrl+1..9 in left-rail order.
+  const jumpPanel = (n: number) => {
+    ;[
+      () => setMainTab('diff'),
+      () => setMainTab('graph'),
+      () => setShowBranches(true),
+      () => setShowRemote(true),
+      () => setShowIssues(true),
+      () => setShowStash(true),
+      () => setShowWorktrees(true),
+      () => setShowReflog(true),
+      () => setShowExcludes(true)
+    ][n - 1]?.()
+  }
+
+  const regionEl = (r: Region): HTMLElement | null =>
+    r === 'topbar'
+      ? topRef.current
+      : r === 'rail'
+        ? railRef.current
+        : r === 'files'
+          ? filesRef.current
+          : r === 'main'
+            ? mainRef.current
+            : commitZoneRef.current
+
+  // Close the top-most open dialog; true if one was closed. Ordered so
+  // stacked dialogs (settings -> connections) close inner-first.
+  const closeTopDialog = () => {
+    const closers: [boolean, () => void][] = [
+      [showCheats, () => setShowCheats(false)],
+      [showPalette, () => setShowPalette(false)],
+      [!!ignoredDialog, () => setIgnoredDialog(null)],
+      [conflictPrompt !== null, () => setConflictPrompt(null)],
+      [!!aiModal, () => setAiModal(null)],
+      [showComposer, () => setShowComposer(false)],
+      [!!coauthorGuard, () => setCoauthorGuard(null)],
+      [!!guard, () => setGuard(null)],
+      [showReview, () => setShowReview(false)],
+      [showIdentity, () => setShowIdentity(false)],
+      [showConnections, () => setShowConnections(false)],
+      [showCoauthors, () => setShowCoauthors(false)],
+      [showPushPreview, () => setShowPushPreview(false)],
+      [!!historyPath, () => setHistoryPath(null)],
+      [!!blamePath, () => setBlamePath(null)],
+      [!!graphPath, () => setGraphPath(null)],
+      [!!rebaseBase, () => setRebaseBase(null)],
+      [showBranches, () => setShowBranches(false)],
+      [showRemote, () => setShowRemote(false)],
+      [showIssues, () => setShowIssues(false)],
+      [showWorktrees, () => setShowWorktrees(false)],
+      [showReflog, () => setShowReflog(false)],
+      [showLFS, () => setShowLFS(false)],
+      [showTrackers, () => setShowTrackers(false)],
+      [showSecurity, () => setShowSecurity(false)],
+      [showWorkspaces, () => setShowWorkspaces(false)],
+      [showInsights, () => setShowInsights(false)],
+      [showSetups, () => setShowSetups(false)],
+      [showSubmodules, () => setShowSubmodules(false)],
+      [showStash, () => setShowStash(false)],
+      [showExcludes, () => setShowExcludes(false)],
+      [showDiscards, () => setShowDiscards(false)],
+      [showConflicts, () => { setShowConflicts(false); setConflictAutoAi(false) }],
+      [showHelp, () => setShowHelp(false)],
+      [showSettings, () => setShowSettings(false)],
+      [!!newRepo, () => setNewRepo(null)]
+    ]
+    const open = closers.find(([on]) => on)
+    if (open) open[1]()
+    return !!open
+  }
+
+  // Same ref trick as `nav` below: one listener, always the current closures.
+  const keys = useRef<(e: KeyboardEvent) => void>(() => {})
+  keys.current = (e) => {
+    if (!cwd) return
+    const combo = comboOf(e)
+    const inText = isTextTarget(e.target)
+    const inCommitBox = e.target === commitRef.current
+    // Topmost open dialog, if any (they all render as fixed full-screen overlays).
+    const overlay = [...document.querySelectorAll<HTMLElement>('.fixed.inset-0')].pop() ?? null
+
+    if (combo === 'escape') {
+      if (branchMenu) { setBranchMenu(false); return }
+      if (moreMenu) { setMoreMenu(false); return }
+      if (undoMenu) { setUndoMenu(false); return }
+      if (closeTopDialog()) return
+      if (ultra) { setUltra(null); return }
+      if (focusLock) { setFocusLock(false); return }
+      if (inCommitBox) {
+        // First Esc: out of the message onto the commit buttons; next Esc leaves.
+        const els = focusables(commitZoneRef.current)
+        const at = els.indexOf(commitRef.current as unknown as HTMLElement)
+        commitRef.current?.blur()
+        ;(els[at + 1] ?? els[0])?.focus()
+        setKbNav(true)
+        return
+      }
+      if (inText) return
+      if (focusRegion !== 'files') { setFocusRegion('files'); return }
+      if (sel) setSel(null)
+      return
+    }
+
+    if (combo === 'ctrl+shift+tab') {
+      e.preventDefault()
+      setKbNav(true)
+      // the sidebar has no ultra view of its own; its dock lives at the bottom
+      setUltra(ultra ? null : focusRegion === 'rail' ? 'files' : focusRegion)
+      return
+    }
+
+    if (combo === 'ctrl+tab') {
+      if (overlay) return
+      e.preventDefault()
+      setKbNav(true)
+      setFocusLock((v) => !v)
+      return
+    }
+
+    if (combo === 'tab' || combo === 'shift+tab') {
+      if (ultra) {
+        // Tab cycles inside the ultra view (wrapping around at the end);
+        // Shift+Left/Right switches views. A dialog on top keeps native Tab.
+        if (overlay && !overlay.hasAttribute('data-ultra')) return
+        e.preventDefault()
+        setKbNav(true)
+        moveFocusWithin(overlay, e.shiftKey ? -1 : 1, { wrap: true, all: true })
+        return
+      }
+      if (overlay) return // let Tab move focus inside the dialog natively
+      if (inText && !inCommitBox) return
+      e.preventDefault()
+      setKbNav(true)
+      const dir = e.shiftKey ? -1 : 1
+      if (focusLock) {
+        // Locked: Tab reaches every control in the area and wraps around.
+        moveFocusWithin(regionEl(focusRegion), dir, { wrap: true, all: true })
+        return
+      }
+      if (!kbNav) {
+        setFocusRegion('rail') // keyboard navigation always starts at the sidebar
+        return
+      }
+      const at = REGION_ORDER.indexOf(focusRegion)
+      const len = REGION_ORDER.length
+      setFocusRegion(REGION_ORDER[(at + dir + len) % len])
+      return
+    }
+
+    if (combo === 'ctrl+k' || combo === 'ctrl+shift+p') {
+      e.preventDefault()
+      setShowPalette(true)
+      return
+    }
+
+    const num = /^ctrl\+([1-9])$/.exec(combo)
+    if (num) {
+      e.preventDefault()
+      jumpPanel(Number(num[1]))
+      return
+    }
+
+    // Shift+Left/Right hop along the ultra dock without leaving ultra.
+    // Works even from the commit message; only a dialog on top blocks it.
+    if (ultra && (combo === 'shift+arrowleft' || combo === 'shift+arrowright')) {
+      if (overlay && !overlay.hasAttribute('data-ultra')) return
+      e.preventDefault()
+      setKbNav(true)
+      const at = ULTRA_ORDER.indexOf(ultra)
+      const len = ULTRA_ORDER.length
+      const next = ULTRA_ORDER[(at + (combo === 'shift+arrowright' ? 1 : -1) + len) % len]
+      setUltra(next)
+      setFocusRegion(next)
+      return
+    }
+
+    // Up/Down step out of the commit message at its edges, onto the controls.
+    if (inCommitBox && (combo === 'arrowup' || combo === 'arrowdown')) {
+      const ta = commitRef.current!
+      const up = combo === 'arrowup'
+      if ((up && ta.selectionStart === 0) || (!up && ta.selectionEnd === ta.value.length)) {
+        e.preventDefault()
+        setKbNav(true)
+        moveFocusWithin(commitZoneRef.current, up ? -1 : 1)
+      }
+      return
+    }
+
+    if (inText) return
+
+    if (combo === '?') {
+      e.preventDefault()
+      setShowCheats((v) => !v)
+      return
+    }
+
+    // A dialog is open: arrows rove its controls, everything else stays dead
+    // so contextual keys cannot reach the app behind it.
+    if (overlay) {
+      if (combo === 'arrowdown' || combo === 'arrowup') {
+        e.preventDefault()
+        moveFocusWithin(overlay, combo === 'arrowdown' ? 1 : -1)
+      }
+      return
+    }
+
+    // Single letters only fire from the app surface itself, not from focused
+    // controls inside menus (those sit outside any data-region container).
+    const el = e.target instanceof HTMLElement ? e.target : null
+    const onSurface = el === document.body || !!el?.closest('[data-region]')
+    if (!onSurface) return
+
+    const hit = findShortcut(focusRegion, combo)
+    if (!hit) return
+    switch (hit.id) {
+      case 'files.move': {
+        e.preventDefault()
+        setKbNav(true)
+        const dir = e.key === 'ArrowDown' ? 1 : -1
+        if (leftMode === 'changes') {
+          moveSelection(dir)
+          break
+        }
+        // Files (tree) view: walk the rows RepoTree currently shows, in order.
+        const rows = [...(filesRef.current?.querySelectorAll<HTMLElement>('[data-tree-path]') ?? [])]
+        const at = rows.findIndex((r) => r.dataset.treePath === previewPath)
+        const next =
+          rows[at === -1 ? (dir === 1 ? 0 : rows.length - 1) : Math.min(Math.max(at + dir, 0), rows.length - 1)]
+        if (next?.dataset.treePath) selectTreeFile(next.dataset.treePath)
+        break
+      }
+      case 'files.mode':
+        e.preventDefault()
+        setLeftMode(e.key === 'ArrowRight' ? 'tree' : 'changes')
+        break
+      case 'files.toggle':
+        e.preventDefault()
+        toggleStage()
+        break
+      case 'files.stageAll':
+        stagePaths(orderedFiles.filter((x) => !x.staged).map((x) => x.file.path))
+        break
+      case 'files.unstageAll':
+        unstagePaths(orderedFiles.filter((x) => x.staged).map((x) => x.file.path))
+        break
+      case 'files.open':
+        if (sel) {
+          setMainTab('diff')
+          setViewTab('diff')
+          setKbNav(true)
+          setFocusRegion('main')
+        }
+        break
+      case 'files.discard':
+        e.preventDefault()
+        if (sel) discardFile(sel.file)
+        break
+      case 'files.commitBox':
+        e.preventDefault()
+        setKbNav(true)
+        setFocusRegion('commit')
+        break
+      case 'main.scroll':
+        e.preventDefault()
+        if (mainTab === 'diff') {
+          mainRef.current
+            ?.querySelector('.overflow-auto')
+            ?.scrollBy({ top: e.key === 'ArrowDown' ? 60 : -60 })
+        } else {
+          // graph/board rows are focusable; arrows walk them, Enter opens
+          moveFocusWithin(mainRef.current, e.key === 'ArrowDown' ? 1 : -1)
+        }
+        break
+      case 'main.diffmode':
+        mainRef.current
+          ?.querySelector<HTMLElement>('[data-diff-mode][data-active="false"]')
+          ?.click()
+        break
+      case 'main.tabs': {
+        e.preventDefault()
+        // With a button in the diff area focused, left/right walk the
+        // buttons; otherwise they switch the main tabs.
+        if (el?.tagName === 'BUTTON' && mainRef.current?.contains(el)) {
+          moveFocusWithin(mainRef.current, e.key === 'ArrowRight' ? 1 : -1)
+          break
+        }
+        const tabs: ('diff' | 'graph' | 'trello')[] = ['diff', 'graph']
+        if (trackers.some((t) => t.type === 'trello' && t.boardId)) tabs.push('trello')
+        const next = tabs[tabs.indexOf(mainTab) + (e.key === 'ArrowRight' ? 1 : -1)]
+        if (next) setMainTab(next)
+        break
+      }
+      case 'main.view':
+        if (!sel) break
+        e.preventDefault()
+        if (e.key === 'd') setViewTab('diff')
+        else if (e.key === 'f') setViewTab('file')
+        else if (e.key === 'p' && isMarkdown(sel.file.path)) setViewTab('preview')
+        break
+      case 'main.toggle':
+        e.preventDefault()
+        toggleStage()
+        break
+      case 'main.blame':
+        if (sel && !sel.file.untracked) setBlamePath(sel.file.path)
+        break
+      case 'main.history':
+        if (sel) setHistoryPath(sel.file.path)
+        break
+      case 'main.graph':
+        if (sel && !sel.file.untracked) setGraphPath(sel.file.path)
+        break
+      case 'main.difftool':
+        if (sel && !sel.file.untracked)
+          run(() => A.difftool(cwd, sel.file.path), 'Launched external diff tool.')
+        break
+      case 'main.reveal':
+        if (sel) run(() => A.revealFile(cwd, sel.file.path))
+        break
+      case 'main.open':
+        if (sel) run(() => A.openFile(cwd, sel.file.path))
+        break
+      case 'undo':
+        doUndoOp()
+        break
+      case 'redo':
+        doRedoOp()
+        break
+      case 'commit.controls':
+        e.preventDefault()
+        moveFocusWithin(commitZoneRef.current, e.key === 'ArrowDown' ? 1 : -1)
+        break
+      case 'topbar.move':
+        e.preventDefault()
+        moveFocusWithin(
+          topRef.current,
+          e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : -1
+        )
+        break
+      case 'rail.move':
+        e.preventDefault()
+        moveFocusWithin(railRef.current, e.key === 'ArrowDown' ? 1 : -1)
+        break
+    }
+  }
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => keys.current(e)
+    const onMouse = (e: MouseEvent) => {
+      setKbNav(false)
+      const region = (e.target as HTMLElement | null)
+        ?.closest?.('[data-region]')
+        ?.getAttribute('data-region') as Region | null
+      if (region) setFocusRegion(region)
+    }
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('mousedown', onMouse)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('mousedown', onMouse)
+    }
+  }, [])
+
+  // Moving regions by keyboard also moves DOM focus, so typing lands in the
+  // commit box and Enter works on the highlighted rail button.
+  useEffect(() => {
+    if (!kbNav) return
+    if (focusRegion === 'commit') {
+      commitRef.current?.focus()
+      return
+    }
+    if (document.activeElement === commitRef.current) commitRef.current?.blur()
+    if (focusRegion === 'topbar') focusables(topRef.current)[0]?.focus()
+    else if (focusRegion === 'rail') railRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
+    else if (focusRegion === 'files') filesRef.current?.focus()
+    else if (focusRegion === 'main') mainRef.current?.focus()
+  }, [focusRegion, kbNav])
+
+  // hint-strip rows, narrowed to what applies to the current selection
+  const stripShortcuts = useMemo(() => {
+    const needsSel = new Set([
+      'files.toggle', 'files.open', 'files.discard',
+      'main.view', 'main.toggle', 'main.blame', 'main.history',
+      'main.graph', 'main.difftool', 'main.reveal', 'main.open'
+    ])
+    const trackedOnly = new Set(['main.blame', 'main.graph', 'main.difftool'])
+    return SHORTCUTS.filter((s) => s.scope === focusRegion)
+      .filter((s) => !(needsSel.has(s.id) && !sel))
+      .filter((s) => !(trackedOnly.has(s.id) && sel?.file.untracked))
+      .map((s) =>
+        s.id === 'main.view' && sel && !isMarkdown(sel.file.path) ? { ...s, display: 'd / f' } : s
+      )
+  }, [focusRegion, sel])
+
   // Respond to native menu actions. Latest handlers kept in a ref so the
   // one-time subscription always calls current closures.
-  const nav = useRef({ open: doOpen, new: doNew, settings: () => {}, stash: () => {} })
+  const nav = useRef({
+    open: doOpen,
+    new: doNew,
+    settings: () => {},
+    stash: () => {},
+    commit: () => {},
+    push: () => {},
+    pull: () => {},
+    fetch: () => {}
+  })
   nav.current.open = doOpen
   nav.current.new = doNew
   nav.current.settings = () => setShowSettings(true)
   nav.current.stash = () => cwd && setShowStash(true)
+  nav.current.commit = () => cwd && attemptCommit(false)
+  nav.current.push = () => cwd && pushWithGuard()
+  nav.current.pull = () => cwd && run(() => A.pull(cwd).then(() => refresh()), 'Pulled.')
+  nav.current.fetch = () => cwd && run(() => A.fetch(cwd).then(() => refresh()), 'Fetched.')
   useEffect(
     () =>
       api().onMenu((a) => {
@@ -642,6 +1219,10 @@ export default function App() {
         else if (a === 'new-repo') nav.current.new()
         else if (a === 'settings') nav.current.settings()
         else if (a === 'stash') nav.current.stash()
+        else if (a === 'commit') nav.current.commit()
+        else if (a === 'push') nav.current.push()
+        else if (a === 'pull') nav.current.pull()
+        else if (a === 'fetch') nav.current.fetch()
       }),
     []
   )
@@ -702,25 +1283,229 @@ export default function App() {
           </div>
         )}
         {newRepo && (
-          <NewRepoPanel
-            initPath={newRepo.initPath}
-            toast={(k, t) => toast(k, t)}
-            onClose={() => setNewRepo(null)}
-            onCreated={(root) => {
-              setNewRepo(null)
-              openRepo(root)
-            }}
-          />
+          <Suspense fallback={null}>
+            <NewRepoPanel
+              initPath={newRepo.initPath}
+              toast={(k, t) => toast(k, t)}
+              onClose={() => setNewRepo(null)}
+              onCreated={(root) => {
+                setNewRepo(null)
+                openRepo(root)
+              }}
+            />
+          </Suspense>
         )}
         <Toasts toasts={toasts} />
       </div>
     )
   }
 
+  // sidebar entries; railMore is the group behind the More toggle
+  interface RailItem {
+    key: string
+    label: string
+    icon: React.ReactNode
+    run: () => void
+    active?: boolean
+    badge?: number
+  }
+  const railMain: RailItem[] = [
+    {
+      key: 'changes',
+      label: 'Changes',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <path d="M7 12h10M7 8h7M7 16h5"/>
+        </svg>
+      ),
+      run: () => setMainTab('diff'),
+      active: mainTab === 'diff',
+      badge: status && !status.clean ? status.files.filter((f) => !f.ignored).length : undefined
+    },
+    {
+      key: 'graph',
+      label: 'Graph / History',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <circle cx="12" cy="12" r="9.5"/><path d="M12 6.8V12l3.6 2.2"/>
+        </svg>
+      ),
+      run: () => setMainTab('graph'),
+      active: mainTab === 'graph'
+    },
+    { key: 'branches', label: 'Branches', icon: <IconBranch className="w-[18px] h-[18px]" />, run: () => setShowBranches(true) },
+    {
+      key: 'prs',
+      label: 'Pull requests',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <circle cx="6" cy="6" r="3"/><path d="M6 9v12M21 6H16m0 0l3-3m-3 3l3 3"/>
+          <circle cx="18" cy="18" r="3"/>
+        </svg>
+      ),
+      run: () => setShowRemote(true)
+    },
+    { key: 'issues', label: 'Issues', icon: <IconWarning className="w-[18px] h-[18px]" />, run: () => setShowIssues(true) }
+  ]
+  const railTools: RailItem[] = [
+    {
+      key: 'stashes',
+      label: 'Stashes',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <path d="M4.2 8.8V20.5h15.6V8.8"/>
+          <rect x="2.2" y="3.5" width="19.6" height="5" rx="0.8"/>
+          <path d="M9.7 12.4h4.6"/>
+        </svg>
+      ),
+      run: () => setShowStash(true)
+    },
+    {
+      key: 'worktrees',
+      label: 'Worktrees',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/>
+          <rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/>
+        </svg>
+      ),
+      run: () => setShowWorktrees(true)
+    },
+    {
+      key: 'reflog',
+      label: 'Undo / Reflog',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <path d="M2.6 4.4v4.8h4.8"/>
+          <path d="M4.3 14.8a8.2 8.2 0 101.9-8.5L2.6 9.2"/>
+        </svg>
+      ),
+      run: () => setShowReflog(true)
+    },
+    {
+      key: 'ignore',
+      label: 'Ignore rules',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <circle cx="12" cy="12" r="9.5"/>
+          <path d="M5.4 5.4l13.2 13.2"/>
+        </svg>
+      ),
+      run: () => setShowExcludes(true)
+    },
+    {
+      key: 'trackers',
+      label: 'Trackers',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <path d="M8.4 6.2h12.4M8.4 12h12.4M8.4 17.8h12.4"/>
+          <path d="M3.4 6.2h.02M3.4 12h.02M3.4 17.8h.02" strokeLinecap="round" strokeWidth="2.4"/>
+        </svg>
+      ),
+      run: () => setShowTrackers(true)
+    }
+  ]
+  const railMore: RailItem[] = [
+    {
+      key: 'insights',
+      label: 'Insights',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <path d="M5 20v-8M11 20V5M17 20v-11M2.5 20h19"/>
+        </svg>
+      ),
+      run: () => setShowInsights(true)
+    },
+    {
+      key: 'workspaces',
+      label: 'Workspaces',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <rect x="3" y="7.5" width="18" height="12.5" rx="2"/>
+          <path d="M9 7.5V6a2 2 0 012-2h2a2 2 0 012 2v1.5M3 12.5h18"/>
+        </svg>
+      ),
+      run: () => setShowWorkspaces(true)
+    },
+    {
+      key: 'setups',
+      label: 'New-repo setups',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <path d="M12 8v8M8 12h8"/>
+        </svg>
+      ),
+      run: () => setShowSetups(true)
+    },
+    {
+      key: 'keys',
+      label: 'Signing & keys',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <circle cx="8" cy="12" r="3.6"/>
+          <path d="M11.6 12H21m-2.8 0v3.4M14.8 12v2.6"/>
+        </svg>
+      ),
+      run: () => setShowSecurity(true)
+    },
+    {
+      key: 'submodules',
+      label: 'Submodules',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <rect x="3" y="3" width="12" height="12" rx="1.5"/>
+          <rect x="9" y="9" width="12" height="12" rx="1.5"/>
+        </svg>
+      ),
+      run: () => setShowSubmodules(true)
+    },
+    {
+      key: 'lfs',
+      label: 'LFS',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <ellipse cx="12" cy="5.6" rx="8" ry="2.8"/>
+          <path d="M4 5.6v12.8c0 1.5 3.6 2.8 8 2.8s8-1.3 8-2.8V5.6"/>
+          <path d="M4 12c0 1.5 3.6 2.8 8 2.8s8-1.3 8-2.8"/>
+        </svg>
+      ),
+      run: () => setShowLFS(true)
+    },
+    {
+      key: 'discards',
+      label: 'Recently discarded',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <path d="M4 7h16M9.2 7V5.2A1.7 1.7 0 0110.9 3.5h2.2a1.7 1.7 0 011.7 1.7V7"/>
+          <path d="M6.4 7l.8 12.1a2 2 0 002 1.9h5.6a2 2 0 002-1.9L17.6 7"/>
+        </svg>
+      ),
+      run: () => setShowDiscards(true)
+    },
+    {
+      key: 'terminal',
+      label: 'Open terminal here',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <rect x="2.5" y="4" width="19" height="16" rx="2"/>
+          <path d="M6.5 9l3.5 3-3.5 3M12.5 15.5H17"/>
+        </svg>
+      ),
+      run: () => A.openTerminal(cwd)
+    }
+  ]
+
   return (
     <div className="flex h-full flex-col bg-ink-950">
       {/* top bar */}
-      <div className="flex items-center gap-2 border-b border-ink-800 bg-ink-900 px-3 py-2">
+      <div
+        ref={topRef}
+        data-region="topbar"
+        className="relative flex items-center gap-2 border-b border-ink-800 bg-ink-900 px-3 py-2"
+      >
+        <FocusHalo on={kbNav && focusRegion === 'topbar'} />
         <button
           onClick={() => setCwd(null)}
           className="btn-ghost px-2 text-slate-400"
@@ -873,6 +1658,32 @@ export default function App() {
       </div>
 
 
+      {/* focus hint strip; only rendered while steering by keyboard */}
+      {kbNav && (
+        <div className="flex h-7 shrink-0 items-center gap-3 overflow-hidden whitespace-nowrap border-b border-accent/30 bg-accent/10 px-3 text-[11px]">
+          <span className="rounded bg-accent px-1.5 py-px text-[10px] font-bold uppercase tracking-wide text-white">
+            {REGION_LABELS[focusRegion]} {ultra ? 'ultra' : focusLock ? 'locked' : 'in focus'}
+          </span>
+          {stripShortcuts.map((s) => (
+            <span key={s.id} className="flex items-baseline gap-1 text-slate-400">
+              <span className="font-mono text-accent">{s.display}</span>
+              {s.short ?? s.label}
+            </span>
+          ))}
+          <span className="flex-1" />
+          <span className="text-ink-500">
+            <span className="font-mono text-slate-400">Tab</span> {focusLock ? 'moves inside' : 'next area'}
+          </span>
+          <span className="text-ink-500">
+            <span className="font-mono text-slate-400">Ctrl+Tab</span> {focusLock ? 'unlock' : 'lock'}
+          </span>
+          <span className="text-ink-500">
+            <span className="font-mono text-slate-400">?</span> all shortcuts
+          </span>
+        </div>
+      )}
+
+
       {/* in-progress operation (cherry-pick / revert / merge / rebase) */}
       {op && op.kind && (
         <div className="flex items-center gap-3 border-b border-warn/40 bg-warn/10 px-4 py-2 text-sm">
@@ -956,7 +1767,12 @@ export default function App() {
             <div key={k} className={`my-1 h-px shrink-0 bg-ink-800 ${expanded ? 'w-full' : 'w-6'}`} />
           )
           return (
+            // the wrapper carries the halo: the nav scrolls, so an absolute
+            // overlay inside it would scroll away with the content
+            <div className="relative flex shrink-0">
             <nav
+              ref={railRef}
+              data-region="rail"
               className={`flex shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-ink-800 bg-ink-900 p-1.5 ${
                 expanded ? 'w-44' : 'w-12 items-center'
               }`}
@@ -973,150 +1789,40 @@ export default function App() {
                 </svg>
                 {expanded && <span className="text-[11px] font-medium">Collapse</span>}
               </button>
-              {navBtn(
-                'changes',
-                'Changes',
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                  <rect x="3" y="3" width="18" height="18" rx="2"/>
-                  <path d="M7 12h10M7 8h7M7 16h5"/>
-                </svg>,
-                () => setMainTab('diff'),
-                mainTab === 'diff',
-                status && !status.clean ? status.files.filter((f) => !f.ignored).length : undefined
-              )}
-              {navBtn(
-                'graph',
-                'Graph / History',
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                  <circle cx="12" cy="12" r="9.5"/><path d="M12 6.8V12l3.6 2.2"/>
-                </svg>,
-                () => setMainTab('graph'),
-                mainTab === 'graph'
-              )}
-              {navBtn('branches', 'Branches', <IconBranch className="w-[18px] h-[18px]" />, () => setShowBranches(true))}
-              {navBtn(
-                'prs',
-                'Pull requests',
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                  <circle cx="6" cy="6" r="3"/><path d="M6 9v12M21 6H16m0 0l3-3m-3 3l3 3"/>
-                  <circle cx="18" cy="18" r="3"/>
-                </svg>,
-                () => setShowRemote(true)
-              )}
-              {navBtn('issues', 'Issues', <IconWarning className="w-[18px] h-[18px]" />, () => setShowIssues(true))}
+              {railMain.map((i) => navBtn(i.key, i.label, i.icon, i.run, i.active, i.badge))}
               {divider('d1')}
-              {navBtn(
-                'stashes',
-                'Stashes',
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                  <path d="M4.2 8.8V20.5h15.6V8.8"/>
-                  <rect x="2.2" y="3.5" width="19.6" height="5" rx="0.8"/>
-                  <path d="M9.7 12.4h4.6"/>
-                </svg>,
-                () => setShowStash(true)
-              )}
-              {navBtn(
-                'worktrees',
-                'Worktrees',
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                  <rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/>
-                  <rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/>
-                </svg>,
-                () => setShowWorktrees(true)
-              )}
-              {navBtn(
-                'reflog',
-                'Undo / Reflog',
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                  <path d="M2.6 4.4v4.8h4.8"/>
-                  <path d="M4.3 14.8a8.2 8.2 0 101.9-8.5L2.6 9.2"/>
-                </svg>,
-                () => setShowReflog(true)
-              )}
-              {navBtn(
-                'ignore',
-                'Ignore rules',
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                  <circle cx="12" cy="12" r="9.5"/>
-                  <path d="M5.4 5.4l13.2 13.2"/>
-                </svg>,
-                () => setShowExcludes(true)
-              )}
-              {navBtn(
-                'trackers',
-                'Trackers',
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                  <path d="M8.4 6.2h12.4M8.4 12h12.4M8.4 17.8h12.4"/>
-                  <path d="M3.4 6.2h.02M3.4 12h.02M3.4 17.8h.02" strokeLinecap="round" strokeWidth="2.4"/>
-                </svg>,
-                () => setShowTrackers(true)
-              )}
+              {railTools.map((i) => navBtn(i.key, i.label, i.icon, i.run))}
               {divider('d2')}
-              {(() => {
-                const moreItems = [
-                  { label: 'Insights', run: () => setShowInsights(true) },
-                  { label: 'Workspaces', run: () => setShowWorkspaces(true) },
-                  { label: 'New-repo setups', run: () => setShowSetups(true) },
-                  { label: 'Signing & keys', run: () => setShowSecurity(true) },
-                  { label: 'Submodules', run: () => setShowSubmodules(true) },
-                  { label: 'LFS', run: () => setShowLFS(true) },
-                  { label: 'Recently discarded', run: () => setShowDiscards(true) },
-                  { label: 'Open terminal here', run: () => A.openTerminal(cwd) }
-                ]
-                return (
-                  <>
-                    <div className={`relative shrink-0 ${expanded ? 'w-full' : ''}`}>
-                      {navBtn(
-                        'more',
-                        'More',
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                          <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
-                        </svg>,
-                        () => setMoreMenu((v) => !v),
-                        moreMenu
-                      )}
-                      {/* collapsed rail has no room for inline rows; fall back to a flyout */}
-                      {moreMenu && !expanded && (
-                        <div
-                          className="absolute left-full top-0 z-30 ml-1 w-48 rounded-lg border border-ink-700 bg-ink-850 py-1 shadow-2xl"
-                          onMouseLeave={() => setMoreMenu(false)}
-                        >
-                          {moreItems.map((m) => (
-                            <button
-                              key={m.label}
-                              onClick={() => { setMoreMenu(false); m.run() }}
-                              className="block w-full px-3 py-1.5 text-left text-sm text-slate-300 hover:bg-ink-800"
-                            >
-                              {m.label}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    {moreMenu &&
-                      expanded &&
-                      moreItems.map((m) => (
-                        <button
-                          key={m.label}
-                          onClick={() => { setMoreMenu(false); m.run() }}
-                          className="flex h-7 w-full shrink-0 items-center rounded-md pl-9 pr-2.5 text-left text-[12px] text-slate-400 hover:bg-ink-750 hover:text-slate-200"
-                        >
-                          {m.label}
-                        </button>
-                      ))}
-                  </>
-                )
-              })()}
+              {/* the More rows render inline so the rail only grows downwards */}
+              {navBtn(
+                'more',
+                'More',
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
+                </svg>,
+                () => setMoreMenu((v) => !v),
+                moreMenu
+              )}
+              {moreMenu && railMore.map((i) => navBtn(i.key, i.label, i.icon, i.run))}
               <div className={`mt-auto flex shrink-0 flex-col gap-0.5 ${expanded ? 'w-full' : 'items-center'}`}>
                 {navBtn('help', 'Help', <IconHelp className="w-[18px] h-[18px]" />, () => setShowHelp(true))}
                 {navBtn('settings', 'Settings', <IconGear className="w-[18px] h-[18px]" />, () => setShowSettings(true))}
               </div>
             </nav>
+            <FocusHalo on={kbNav && focusRegion === 'rail'} />
+            </div>
           )
         })()}
 
         {/* left: files */}
-        <div className="flex shrink-0 flex-col" style={{ width: leftW }}>
+        <div
+          ref={filesRef}
+          data-region="files"
+          tabIndex={-1}
+          className="relative flex shrink-0 flex-col outline-none"
+          style={{ width: leftW }}
+        >
+          <FocusHalo on={kbNav && focusRegion === 'files'} />
           {/* Changes / Tree switch */}
           <div className="flex items-center gap-1 border-b border-ink-800 bg-ink-900 px-2 py-1.5">
             <div className="flex flex-1 gap-1 rounded-lg bg-ink-950 p-0.5">
@@ -1157,23 +1863,9 @@ export default function App() {
                 treeView={settings.treeView}
                 showIgnored={settings.showIgnored}
                 onSelect={selectFile}
-                onStage={(p) => run(() => A.stage(cwd, p).then(() => refresh()))}
-                onUnstage={(p) => run(() => A.unstage(cwd, p).then(() => refresh()))}
-                onDiscard={async (f) => {
-                  const ok = await confirmDialog({
-                    title: f.untracked ? 'Delete untracked file' : 'Discard changes',
-                    danger: true,
-                    message: f.untracked
-                      ? `Delete untracked file ${basename(f.path)} from disk?`
-                      : `Discard changes to ${basename(f.path)}?`,
-                    detail: f.untracked
-                      ? 'This is permanent.'
-                      : 'It will be reverted to the last commit. This cannot be undone.',
-                    confirmLabel: f.untracked ? 'Delete' : 'Discard',
-                    cancelLabel: 'Cancel'
-                  })
-                  if (ok) run(() => A.discard(cwd, f.path, f.untracked).then(() => refresh()))
-                }}
+                onStage={stagePaths}
+                onUnstage={unstagePaths}
+                onDiscard={discardFile}
                 onUntrack={async (p) => {
                   const ok = await confirmDialog({
                     title: 'Stop tracking file',
@@ -1184,7 +1876,7 @@ export default function App() {
                   })
                   if (ok) run(() => A.untrack(cwd, p).then(() => refresh()), 'Untracked (file kept on disk).')
                 }}
-                onHide={(p, h) => run(() => A.hide(cwd, p, h).then(() => refresh()), h ? 'Hidden from commits.' : 'Unhidden.')}
+                onHide={hidePath}
                 onHistory={(p) => setHistoryPath(p)}
               />
             )
@@ -1210,7 +1902,13 @@ export default function App() {
         />
 
         {/* right: diff + meta */}
-        <div className="flex min-w-0 flex-1 flex-col bg-ink-900">
+        <div
+          ref={mainRef}
+          data-region="main"
+          tabIndex={-1}
+          className="relative flex min-w-0 flex-1 flex-col bg-ink-900 outline-none"
+        >
+          <FocusHalo on={kbNav && focusRegion === 'main'} />
           {(() => {
             const trelloTracker = trackers.find((t) => t.type === 'trello' && t.boardId)
             const tabs: { id: 'diff' | 'graph' | 'trello'; label: string }[] = [
@@ -1255,12 +1953,14 @@ export default function App() {
             if (!trelloTracker) return null
             return (
               <div className="flex flex-1 min-h-0">
-                <TrelloBoardView
-                  tracker={trelloTracker}
-                  cwd={cwd}
-                  toast={(k, t) => toast(k, t)}
-                  onBranchCreated={() => { refresh(); setMainTab('diff') }}
-                />
+                <Suspense fallback={<div className="p-4 text-sm text-slate-500">Loading board...</div>}>
+                  <TrelloBoardView
+                    tracker={trelloTracker}
+                    cwd={cwd}
+                    toast={(k, t) => toast(k, t)}
+                    onBranchCreated={() => { refresh(); setMainTab('diff') }}
+                  />
+                </Suspense>
               </div>
             )
           })()}
@@ -1268,8 +1968,9 @@ export default function App() {
             <FilePreview cwd={cwd} path={previewPath} toast={(k, t) => toast(k, t)} />
           ) : sel ? (
             <>
-              <div className="flex items-center gap-3 border-b border-ink-800 px-4 py-2.5">
-                <span className="truncate text-sm font-medium text-slate-100">{sel.file.path}</span>
+              {/* wraps on narrow windows so the action buttons never clip away */}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-ink-800 px-4 py-2.5">
+                <span className="min-w-0 truncate text-sm font-medium text-slate-100">{sel.file.path}</span>
                 <span className="text-[11px] text-slate-500">
                   {sel.staged ? 'staged changes' : sel.file.untracked ? 'new file' : 'working changes'}
                 </span>
@@ -1290,6 +1991,20 @@ export default function App() {
                   ))}
                 </div>
                 <div className="flex-1" />
+                <button
+                  className="btn-ghost text-xs"
+                  onClick={() => run(() => A.revealFile(cwd, sel.file.path))}
+                  title="Show the file in the system file manager (r)"
+                >
+                  Reveal
+                </button>
+                <button
+                  className="btn-ghost text-xs"
+                  onClick={() => run(() => A.openFile(cwd, sel.file.path))}
+                  title="Open the file with its default application (o)"
+                >
+                  Open
+                </button>
                 {!sel.file.untracked && (
                   <>
                     <button className="btn-ghost text-xs" onClick={() => setBlamePath(sel.file.path)}>
@@ -1391,7 +2106,13 @@ export default function App() {
         />
 
         {/* commit zone */}
-        <div className="flex shrink-0 flex-col" style={{ width: commitW }}>
+        <div
+          ref={commitZoneRef}
+          data-region="commit"
+          className="relative flex shrink-0 flex-col"
+          style={{ width: commitW }}
+        >
+          <FocusHalo on={kbNav && focusRegion === 'commit'} />
           {/* terminal-style header: the signature element */}
           <div className="border-b border-ink-800 bg-ink-900 px-3 py-2.5">
             <div className="mb-1.5 flex items-center font-mono text-[11px]">
@@ -1454,6 +2175,7 @@ export default function App() {
                 ).map(([key, n]) => (
                   <button
                     key={key}
+                    data-rove-skip // arrow cycling skips these; locked mode (Ctrl+Tab) reaches them
                     className="rounded px-1 hover:bg-ink-750 hover:text-slate-300"
                     onClick={() => setIgnoredDialog(key)}
                   >
@@ -1484,13 +2206,11 @@ export default function App() {
             </button>
 
             <textarea
+              ref={commitRef}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder={`Commit message${stagedCount ? ` (${stagedCount} staged)` : ''}...`}
               rows={4}
-              onKeyDown={(e) => {
-                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') attemptCommit(false)
-              }}
               className="w-full resize-none rounded-lg border border-ink-700 bg-ink-950 px-3 py-2 text-sm leading-relaxed outline-none focus:border-accent select-text"
             />
 
@@ -1577,6 +2297,65 @@ export default function App() {
             <span className="text-accent">pushed</span>
             <span className="text-slate-500">{relTime(repoMeta.lastPush)}</span>
           </span>
+          <span className="h-3 w-px bg-ink-700" />
+          <div className="relative">
+            <button
+              className="rounded px-1.5 hover:bg-ink-750 hover:text-slate-300"
+              onClick={() => setUndoMenu((v) => !v)}
+              title="Undo/redo log for staging operations (z to undo, Shift+Z to redo)"
+            >
+              undo <span className="font-semibold text-slate-400">{undoStack.length}</span> / redo{' '}
+              <span className="font-semibold text-slate-400">{redoStack.length}</span>
+            </button>
+            {undoMenu && (
+              <div
+                className="absolute bottom-6 left-0 z-40 w-72 rounded-lg border border-ink-700 bg-ink-850 py-1.5 shadow-2xl"
+                onMouseLeave={() => setUndoMenu(false)}
+              >
+                <div className="flex gap-2 px-3 pb-1.5">
+                  <button
+                    className="btn-soft flex-1 text-xs"
+                    disabled={busy || undoStack.length === 0}
+                    onClick={doUndoOp}
+                  >
+                    Undo (z)
+                  </button>
+                  <button
+                    className="btn-soft flex-1 text-xs"
+                    disabled={busy || redoStack.length === 0}
+                    onClick={doRedoOp}
+                  >
+                    Redo (Shift+Z)
+                  </button>
+                </div>
+                <div className="max-h-52 overflow-auto">
+                  {undoStack.length === 0 && (
+                    <div className="px-3 py-1 text-slate-600">
+                      Nothing to undo - stage, unstage or hide something first.
+                    </div>
+                  )}
+                  {[...undoStack].reverse().map((op, i) => (
+                    <div key={'u' + i} className="flex items-center px-3 py-1">
+                      <span className={i === 0 ? 'text-slate-200' : 'text-slate-500'}>{op.label}</span>
+                      {i === 0 && <span className="ml-auto text-[10px] text-accent">next undo</span>}
+                    </div>
+                  ))}
+                  {redoStack.length > 0 && (
+                    <>
+                      <div className="mt-1 border-t border-ink-800 px-3 pt-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+                        Redo
+                      </div>
+                      {[...redoStack].reverse().map((op, i) => (
+                        <div key={'r' + i} className="px-3 py-1 text-slate-500">
+                          {op.label}
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
           {ignoredFiles && (
             <>
               <span className="h-3 w-px bg-ink-700" />
@@ -1616,6 +2395,8 @@ export default function App() {
         </div>
       )}
 
+      {/* lazy dialog panels */}
+      <Suspense fallback={null}>
       {showCoauthors && (
         <CoauthorPanel
           cwd={cwd}
@@ -1813,6 +2594,9 @@ export default function App() {
               { label: 'Switch repository', run: () => setCwd(null) },
               { label: 'Refresh', run: () => run(() => refresh(), 'Refreshed.') },
               { label: 'Recently discarded', run: () => setShowDiscards(true) },
+              { label: 'Undo last operation', hint: 'z', run: doUndoOp },
+              { label: 'Redo operation', hint: 'Shift+Z', run: doRedoOp },
+              { label: 'Keyboard shortcuts', hint: '?', run: () => setShowCheats(true) },
               { label: 'Help', run: () => setShowHelp(true) },
               { label: 'Show file colour key', run: () => updateSettings({ showLegend: true }) }
             ] as PaletteAction[]
@@ -2019,12 +2803,103 @@ export default function App() {
         />
       )}
       {showHelp && <HelpPanel onClose={() => setShowHelp(false)} />}
+      {showCheats && <ShortcutSheet onClose={() => setShowCheats(false)} />}
+      {ultra === 'topbar' && (
+        <UltraTop
+          cwd={cwd}
+          status={status}
+          busy={busy}
+          onHome={() => {
+            setUltra(null)
+            setCwd(null)
+          }}
+          onMainView={() => setUltra(null)}
+          onOpenFolder={() => run(() => A.openFile(cwd, '.'))}
+          onRefresh={() => {
+            loadIdentity()
+            run(() => refresh(), 'Refreshed.')
+          }}
+          onFetch={() => run(() => A.fetch(cwd).then(() => refresh()), 'Fetched.')}
+          onPull={() => run(() => A.pull(cwd).then(() => refresh()), 'Pulled.')}
+          onReview={() => setShowPushPreview(true)}
+          onPush={() => pushWithGuard()}
+        />
+      )}
+      {ultra === 'files' && (
+        <UltraFiles
+          cwd={cwd}
+          statusMap={statusMap}
+          onPick={(p) => {
+            setUltra(null)
+            setMainTab('diff')
+            setLeftMode('tree')
+            selectTreeFile(p)
+          }}
+        />
+      )}
+      {ultra === 'main' && (
+        <UltraGraph
+          cwd={cwd}
+          currentBranch={status?.branch ?? ''}
+          trelloTracker={trackers.find((t) => t.type === 'trello' && t.boardId) ?? null}
+          aiAvailable={aiAvailable}
+          toast={(k, t) => toast(k, t)}
+          onChanged={() => {
+            refresh()
+            loadIdentity()
+          }}
+          onInteractiveRebase={(base) => setRebaseBase(base)}
+          onAi={(title, runFn) => setAiModal({ title, run: runFn })}
+          onBranchCreated={() => {
+            setUltra(null)
+            refresh()
+            setMainTab('diff')
+          }}
+        />
+      )}
+      {ultra === 'commit' && (
+        <UltraCommit
+          cwd={cwd}
+          status={status}
+          identity={identity}
+          coauthors={activeCo}
+          message={message}
+          setMessage={setMessage}
+          amend={amend}
+          setAmend={setAmend}
+          busy={busy}
+          stagedCount={stagedCount}
+          stagedAdd={stagedTotals.add}
+          stagedDel={stagedTotals.del}
+          onCommit={(push) => attemptCommit(push)}
+          onPreview={() => {
+            refresh()
+            setShowReview(true)
+          }}
+          onFetch={() => run(() => A.fetch(cwd).then(() => refresh()), 'Fetched.')}
+          onPull={() => run(() => A.pull(cwd).then(() => refresh()), 'Pulled.')}
+          onPush={() => pushWithGuard()}
+          onCoauthors={() => setShowCoauthors(true)}
+          onIdentity={() => setShowIdentity(true)}
+        />
+      )}
       {showDiscards && (
         <DiscardsPanel
           cwd={cwd}
           toast={(k, t) => toast(k, t)}
           onChanged={() => refresh()}
           onClose={() => setShowDiscards(false)}
+        />
+      )}
+      </Suspense>
+      {/* outside the overlays so its buttons stay out of Tab's reach */}
+      {ultra && (
+        <UltraDock
+          current={ultra}
+          onPick={(r) => {
+            setUltra(r)
+            setFocusRegion(r)
+          }}
         />
       )}
       <Toasts toasts={toasts} />

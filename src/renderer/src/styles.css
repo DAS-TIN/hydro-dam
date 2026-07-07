@@ -183,9 +183,31 @@ a:focus-visible,
   to   { transform: scaleX(1); }
 }
 
+/* Ultra focus footer: a slowly flowing accent gradient. */
+.ultra-footer {
+  background: linear-gradient(
+    90deg,
+    rgb(var(--accent) / 0.25),
+    rgb(var(--accent) / 0.65),
+    rgb(var(--accent) / 0.25)
+  );
+  background-size: 200% 100%;
+  animation: hd-flow 6s linear infinite;
+  border-top: 1px solid rgb(var(--accent) / 0.5);
+  backdrop-filter: blur(4px);
+}
+
+@keyframes hd-flow {
+  from { background-position: 0% 0; }
+  to   { background-position: 200% 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .caret {
     animation: none;
     opacity: 1;
+  }
+  .ultra-footer {
+    animation: none;
   }
 }
