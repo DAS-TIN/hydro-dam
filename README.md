@@ -164,7 +164,7 @@ Contributions are welcome.
 If Hydrodam is useful to you, a star helps other people find it.
 
 <div align="center">
-<a href="https://star-history.com/#DAS-TIN/hydro-dam&Date">
+<a href="https://www.star-history.com/?type=date&repos=DAS-TIN%2Fhydro-dam">
 <picture>
 <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=DAS-TIN/hydro-dam&type=Date&theme=dark" />
 <img alt="Star history chart for hydro-dam" src="https://api.star-history.com/svg?repos=DAS-TIN/hydro-dam&type=Date" />
