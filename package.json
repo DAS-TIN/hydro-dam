@@ -1,7 +1,7 @@
 {
   "name": "hydrodam",
   "productName": "Hydrodam",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A safer git desktop client. Commit as the right person and see exactly what you are about to commit.",
   "main": "./out/main/index.js",
   "author": "Dastin Depta",
