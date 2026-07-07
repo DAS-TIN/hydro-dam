@@ -12,7 +12,7 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "start": "electron-vite preview",
-    "test": "node --test test/",
+    "test": "node --test",
     "package": "electron-vite build && electron-builder"
   },
   "build": {
