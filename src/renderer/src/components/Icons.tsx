@@ -1,13 +1,15 @@
-import logoUrl from '../icons/logo.svg'
+import logoUrl from '../icons/logo.png'
 
-// The Hydrodam logo (icons/logo.svg). It is a traced artwork with its own
-// colours, so it renders as an image tile rather than a currentColor path.
+// The Hydrodam logo. The source artwork (icons/logo.svg) is ~220 KB of traced
+// paths that Chromium re-rasterizes at every drawn size, stalling the UI, so
+// the app ships a pre-rendered PNG instead - see scripts/logo-png.mjs.
 export function IconLogo({ className = 'w-5 h-5' }: { className?: string }) {
   return (
     <img
       src={logoUrl}
       alt="Hydrodam"
       draggable={false}
+      decoding="async"
       className={`${className} rounded-md object-contain`}
     />
   )
