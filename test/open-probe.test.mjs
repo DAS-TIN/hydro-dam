@@ -31,9 +31,17 @@ function repoRoot(cwd) {
   }
 }
 
+function canonPath(p) {
+  try {
+    return realpathSync.native(p)
+  } catch {
+    return resolve(p)
+  }
+}
+
 function samePath(a, b) {
-  const x = resolve(a)
-  const y = resolve(b)
+  const x = canonPath(a)
+  const y = canonPath(b)
   return process.platform === 'win32' ? x.toLowerCase() === y.toLowerCase() : x === y
 }
 

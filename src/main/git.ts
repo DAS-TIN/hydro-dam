@@ -8,7 +8,7 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { createHash } from 'node:crypto'
-import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, existsSync, readdirSync } from 'node:fs'
+import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, existsSync, readdirSync, realpathSync } from 'node:fs'
 import { join, resolve, dirname } from 'node:path'
 import { homedir, tmpdir } from 'node:os'
 import * as Templates from './templates'
@@ -1876,10 +1876,21 @@ export async function repoRoot(cwd: string): Promise<string | null> {
   }
 }
 
+// One folder can have several spellings: Windows 8.3 short names (RUNNER~1 vs
+// runneradmin), symlinked temp dirs (macOS /var -> /private/var). Canonicalize
+// before comparing; fall back to resolve() for paths that do not exist.
+function canonPath(p: string): string {
+  try {
+    return realpathSync.native(p)
+  } catch {
+    return resolve(p)
+  }
+}
+
 /** True if two paths point at the same folder (case-insensitive on Windows). */
 export function samePath(a: string, b: string): boolean {
-  const x = resolve(a)
-  const y = resolve(b)
+  const x = canonPath(a)
+  const y = canonPath(b)
   return process.platform === 'win32' ? x.toLowerCase() === y.toLowerCase() : x === y
 }
 
