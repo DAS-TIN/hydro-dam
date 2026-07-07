@@ -159,6 +159,21 @@ Contributions are welcome.
 
 ---
 
+## Star history
+
+If Hydrodam is useful to you, a star helps other people find it.
+
+<div align="center">
+<a href="https://star-history.com/#DAS-TIN/hydro-dam&Date">
+<picture>
+<source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=DAS-TIN/hydro-dam&type=Date&theme=dark" />
+<img alt="Star history chart for hydro-dam" src="https://api.star-history.com/svg?repos=DAS-TIN/hydro-dam&type=Date" />
+</picture>
+</a>
+</div>
+
+---
+
 ## License and credits
 
 Hydrodam is released under the **Apache License 2.0**. See [LICENSE](LICENSE) and [NOTICE](NOTICE) for details. Copyright 2026 Dastin Depta. To cite the project, see [CITATION.cff](CITATION.cff).
