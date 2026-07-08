@@ -6,8 +6,8 @@ import { writeFileSync, mkdirSync, readdirSync, rmSync, existsSync } from 'node:
 import { join } from 'node:path'
 import { writeJson } from './util.mjs'
 import { activeLocks } from './locks.mjs'
-import { agentsOf } from './actors.mjs'
 import { taskProgress } from './checkpoints.mjs'
+import { excludeLocally } from './store.mjs'
 
 const SAFETY_RULES = `## Safety rules
 
@@ -17,7 +17,46 @@ const SAFETY_RULES = `## Safety rules
 - Never touch files in your task's forbidden list.
 - Stay inside the allowed files for your task when a list is present.
 - When you finish a coherent piece of work, suggest a checkpoint instead of continuing to pile up changes.
-- Report your position by writing .rtc/presence/<your-actor-id>.json with {"activeFiles":[],"cursor":{"path":"...","line":1},"note":"..."}.`
+- Report your position by writing .rtc/presence/<your-actor-id>.json with {"activeFiles":[],"cursor":{"path":"...","line":1},"note":"..."}.
+- If the Hydrodam MCP server is connected, use its rtc_* tools instead of raw files: call rtc_guide once, then follow it for every change.`
+
+// The one workflow description every assistant sees, whether it arrives over
+// MCP (rtc_guide tool) or by reading the generated skill file in the repo.
+export const ASSISTANT_GUIDE = `Hydrodam live collaboration - how to work in this session
+
+You are an AI assistant inside a shared repo session. Other people (and
+their assistants) may be editing their own copies at the same time, so
+every change you make follows this loop:
+
+1. Identify yourself once: call rtc_join with your name and your user's
+   name. It returns your actor id - pass that id to every other rtc tool.
+2. Look before you start: rtc_status shows who is connected, what they are
+   working on, open tasks, locks and the endpoints others have declared.
+3. Declare a plan BEFORE editing anything: call rtc_plan with
+   - what you are doing (task title and a short description),
+   - the files you want to lock while you work,
+   - the endpoints or interfaces you will add or change (name + signature).
+   Declaring endpoints at plan time lets someone working on the same
+   feature build against your contract before your code lands, and it
+   surfaces collisions early. If a file is already locked by someone else,
+   coordinate with them instead of editing it.
+4. Keep presence fresh with rtc_presence (file, line, a short note) so the
+   app shows where you are working.
+5. Before EVERY file write, call rtc_check_files. If a file changed since
+   you claimed it, your user (or someone else) edited it while you worked.
+   Treat that exactly like a merge conflict: re-read the file, merge their
+   changes with yours, call rtc_claim_files to refresh your baseline, and
+   only then write. After each write, call rtc_claim_files again so your
+   own edit becomes the new baseline.
+6. When a coherent piece of work is done, call rtc_checkpoint. It turns
+   your changes into a reviewable patch and checkpoint; a person reviews,
+   applies and commits it in Hydrodam. Never commit, stage or push
+   yourself.
+7. Finished or stepping away? rtc_release frees your locks and baselines.
+
+The shared session state is also on disk under .rtc/ (context.md, your
+brief in agents/, tasks/, locks.json, contracts.json) if you cannot reach
+the MCP server.`
 
 function fmtTask(t, patches) {
   const crit = (t.acceptanceCriteria || []).map((c) => `- [${c.done ? 'x' : ' '}] ${c.text}`).join('\n')
@@ -51,10 +90,6 @@ export function writeContext(cwd, state) {
   const locks = activeLocks(state.locks)
   writeJson(join(dir, 'locks.json'), locks)
   writeJson(join(dir, 'actors.json'), state.actors)
-  writeJson(
-    join(dir, 'contracts.json'),
-    locks.filter((l) => l.lockType === 'contract')
-  )
 
   // context.md - the shared picture.
   const actorsList = state.actors
@@ -70,6 +105,9 @@ export function writeContext(cwd, state) {
     .join('\n')
   const lockList = locks
     .map((l) => `- ${l.path} [${l.hardLock ? 'HARD' : 'soft'}] held by ${l.lockedByActorId}${l.reason ? `: ${l.reason}` : ''}`)
+    .join('\n')
+  const contractList = (state.contracts || [])
+    .map((c) => `- ${c.name}: ${c.signature}${c.file ? ` (${c.file})` : ''} - declared by ${c.actorId}${c.taskId ? ` for ${c.taskId}` : ''}`)
     .join('\n')
 
   const md = [
@@ -95,6 +133,10 @@ export function writeContext(cwd, state) {
     '',
     lockList || '(nothing locked)',
     '',
+    '## Declared endpoints',
+    '',
+    contractList || '(none declared yet - declare yours with rtc_plan before you build)',
+    '',
     '## Checkpoint rules',
     '',
     '- Group related changes into a patch for your task.',
@@ -115,6 +157,30 @@ export function writeContext(cwd, state) {
   }
   for (const t of state.tasks) {
     writeFileSync(join(dir, 'tasks', `${t.id}.md`), fmtTask(t, state.patches) + '\n', 'utf8')
+  }
+
+  // The same guide as the rtc_guide MCP tool, dropped in as a Claude Code
+  // skill so an assistant that never connects to MCP still finds the rules.
+  // Local-excluded so it never shows up in the user's git status.
+  try {
+    const skillDir = join(cwd, '.claude', 'skills', 'hydrodam-collab')
+    mkdirSync(skillDir, { recursive: true })
+    writeFileSync(
+      join(skillDir, 'SKILL.md'),
+      [
+        '---',
+        'name: hydrodam-collab',
+        'description: This repo is in a live Hydrodam collaboration session with other people and assistants. Read BEFORE making any change here - declare a plan and lock files first, check for concurrent edits before every write, and hand finished work back as a checkpoint.',
+        '---',
+        '',
+        ASSISTANT_GUIDE,
+        ''
+      ].join('\n'),
+      'utf8'
+    )
+    excludeLocally(cwd, '.claude/skills/hydrodam-collab/')
+  } catch {
+    // The skill file is a convenience; a read-only tree must not break sync.
   }
 
   // Per-agent identity briefs: who the agent is, who owns it, what it may do.

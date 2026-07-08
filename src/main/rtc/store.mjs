@@ -12,24 +12,28 @@ export function rtcDir(cwd) {
   return join(cwd, '.rtc')
 }
 
+/** Add a pattern to .git/info/exclude (local only, never touches .gitignore). */
+export function excludeLocally(cwd, pattern) {
+  if (!existsSync(join(cwd, '.git'))) return
+  try {
+    mkdirSync(join(cwd, '.git', 'info'), { recursive: true })
+    const excl = join(cwd, '.git', 'info', 'exclude')
+    const cur = existsSync(excl) ? readFileSync(excl, 'utf8') : ''
+    if (!cur.split(/\r?\n/).includes(pattern)) {
+      writeFileSync(excl, cur + (cur.endsWith('\n') || !cur ? '' : '\n') + pattern + '\n', 'utf8')
+    }
+  } catch {
+    // Local exclude is a nicety; a read-only .git must not break sessions.
+  }
+}
+
 /** Create .rtc and make sure git ignores it locally. */
 export function ensureRtc(cwd) {
   const dir = rtcDir(cwd)
   mkdirSync(join(dir, 'tasks'), { recursive: true })
   mkdirSync(join(dir, 'agents'), { recursive: true })
   mkdirSync(join(dir, 'presence'), { recursive: true })
-  const excl = join(cwd, '.git', 'info', 'exclude')
-  if (existsSync(join(cwd, '.git'))) {
-    try {
-      mkdirSync(join(cwd, '.git', 'info'), { recursive: true })
-      const cur = existsSync(excl) ? readFileSync(excl, 'utf8') : ''
-      if (!cur.split(/\r?\n/).includes('.rtc/')) {
-        writeFileSync(excl, cur + (cur.endsWith('\n') || !cur ? '' : '\n') + '.rtc/\n', 'utf8')
-      }
-    } catch {
-      // Local exclude is a nicety; a read-only .git must not break sessions.
-    }
-  }
+  excludeLocally(cwd, '.rtc/')
   return dir
 }
 
@@ -47,6 +51,7 @@ const FILES = {
   suggestions: 'suggestions.json',
   changes: 'changes.json',
   violations: 'violations.json',
+  contracts: 'contracts.json',
   manifest: 'manifest.json',
   settings: 'settings.json',
   local: 'local.json'
@@ -81,6 +86,7 @@ export function loadState(cwd) {
     suggestions: loadColl(cwd, 'suggestions', []),
     changes: loadColl(cwd, 'changes', []),
     violations: loadColl(cwd, 'violations', []),
+    contracts: loadColl(cwd, 'contracts', []),
     manifest: loadColl(cwd, 'manifest', { entries: [], manifestHash: '' }),
     settings: { ...DEFAULT_SESSION_SETTINGS, ...loadColl(cwd, 'settings', {}) },
     local: loadColl(cwd, 'local', { activeActorId: null, activeTaskId: null }),

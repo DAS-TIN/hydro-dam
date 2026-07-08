@@ -21,7 +21,7 @@ function initGuestState(cwd, invite, guest, now) {
   Store.saveColl(cwd, 'manifest', invite.manifest || { entries: [], manifestHash: invite.manifestHash || '' })
   Store.saveColl(cwd, 'settings', invite.settings || Store.DEFAULT_SESSION_SETTINGS)
   Store.saveColl(cwd, 'local', { activeActorId: guest.id, activeTaskId: null })
-  for (const name of ['tasks', 'locks', 'patches', 'checkpoints', 'suggestions', 'changes', 'violations']) {
+  for (const name of ['tasks', 'locks', 'patches', 'checkpoints', 'suggestions', 'changes', 'violations', 'contracts']) {
     Store.saveColl(cwd, name, Store.loadColl(cwd, name, []))
   }
 }

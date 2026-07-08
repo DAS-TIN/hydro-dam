@@ -74,7 +74,7 @@ export async function createSession(cwd, opts = {}, now = Date.now()) {
   Store.saveColl(cwd, 'manifest', manifest)
   Store.saveColl(cwd, 'settings', settings)
   Store.saveColl(cwd, 'local', { activeActorId: host.id, activeTaskId: null })
-  for (const name of ['tasks', 'locks', 'patches', 'checkpoints', 'suggestions', 'changes', 'violations']) {
+  for (const name of ['tasks', 'locks', 'patches', 'checkpoints', 'suggestions', 'changes', 'violations', 'contracts']) {
     Store.saveColl(cwd, name, [])
   }
   return Store.loadState(cwd)

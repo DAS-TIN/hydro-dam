@@ -120,8 +120,8 @@ export default function RtcActorsScreen({
           <div className="flex gap-2">
             <select className={inputCls} value={type} onChange={(e) => setType(e.target.value as any)}>
               <option value="human">Human</option>
-              <option value="agent">AI agent</option>
-              <option value="manager">Manager agent</option>
+              <option value="agent">AI assistant</option>
+              <option value="manager">Manager assistant</option>
             </select>
             <input
               className={`flex-1 ${inputCls}`}
@@ -144,8 +144,10 @@ export default function RtcActorsScreen({
             </button>
           </div>
           <p className="text-[11px] text-slate-500">
-            Every agent has an owner. Agents read .rtc/agents/&lt;id&gt;.md to learn who they are,
-            their task, and the safety rules; they report position via .rtc/presence/&lt;id&gt;.json.
+            Every assistant has an owner. An assistant connected through the Hydrodam MCP server
+            (Claude Code, for example) joins this list by itself when it calls rtc_join; you only
+            add one by hand if it cannot reach MCP. Assistants read .rtc/agents/&lt;id&gt;.md for who
+            they are and the rules, and report position via .rtc/presence/&lt;id&gt;.json.
           </p>
         </div>
       </Section>

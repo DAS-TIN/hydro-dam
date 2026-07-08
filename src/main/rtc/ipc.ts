@@ -3,6 +3,9 @@
 // resulting state bundle plus change events.
 
 import { ipcMain, BrowserWindow, dialog } from 'electron'
+import * as Mcp from '../mcp'
+import { withState, broadcast } from './state'
+import { registerRtcMcpTools } from './mcp-tools'
 import * as Session from './session.mjs'
 import * as Join from './join.mjs'
 import * as Store from './store.mjs'
@@ -25,26 +28,6 @@ function handle<T>(channel: string, fn: (...args: any[]) => Promise<T> | T) {
       return { ok: false, error: err?.message || String(err) }
     }
   })
-}
-
-function broadcast(payload: any) {
-  for (const w of BrowserWindow.getAllWindows()) w.webContents.send('rtc:event', payload)
-}
-
-const COLLECTIONS = [
-  'session', 'actors', 'tasks', 'locks', 'patches',
-  'checkpoints', 'suggestions', 'changes', 'violations', 'manifest', 'settings', 'local'
-] as const
-
-// Load state, let fn mutate it, persist everything, refresh agent context.
-async function withState<T>(cwd: string, fn: (state: any) => Promise<T> | T): Promise<T> {
-  const state = Store.loadState(cwd)
-  if (!state) throw new Error('No RTC session in this repository.')
-  const result = await fn(state)
-  for (const name of COLLECTIONS) Store.saveColl(cwd, name, state[name])
-  Context.writeContext(cwd, state)
-  broadcast({ kind: 'state', cwd })
-  return result
 }
 
 // One live watcher at a time (the focused repo).
@@ -91,6 +74,9 @@ function dialogParent(): BrowserWindow {
 }
 
 export function registerRtcIpc(): void {
+  // Connected assistants (Claude Code and friends) get the rtc_* MCP tools.
+  Mcp.setExtraTools(registerRtcMcpTools)
+
   handle('rtc:probe', (cwd: string) => Session.probe(cwd))
   handle('rtc:state', (cwd: string) => Store.loadState(cwd))
   handle('rtc:create', async (cwd: string, opts: any) => {

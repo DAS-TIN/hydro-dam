@@ -10,7 +10,7 @@ export function ActorChip({ actors, actorId, small }: { actors: RtcActor[]; acto
     <span className={`inline-flex items-center gap-1.5 ${small ? 'text-[11px]' : 'text-xs'}`}>
       <span className={`h-2 w-2 shrink-0 rounded-full ${c.bg}`} />
       <span className={c.text}>{label}</span>
-      {a?.type === 'agent' && <span className="text-[10px] text-slate-500">agent</span>}
+      {a?.type === 'agent' && <span className="text-[10px] text-slate-500">assistant</span>}
       {a?.type === 'manager' && <span className="text-[10px] text-slate-500">manager</span>}
     </span>
   )

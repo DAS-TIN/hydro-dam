@@ -64,6 +64,10 @@ function riskFor(files) {
  * Turn an actor's pending changes (or an explicit file list) into a patch:
  * a unified diff against the session base commit. Untracked files are
  * included via intent-to-add so they show up in the diff.
+ *
+ * @param {string} cwd
+ * @param {any} state
+ * @param {{ actorId: string, taskId?: string | null, paths?: string[] | null, summary?: string }} opts
  */
 export async function createPatch(cwd, state, { actorId, taskId = null, paths = null, summary = '' }, now = Date.now()) {
   const mine = state.changes.filter(

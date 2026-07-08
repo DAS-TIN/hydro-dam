@@ -15,6 +15,14 @@ let http: HttpServer | null = null
 let currentPort = 0
 let lastError: string | null = null
 
+// Feature modules (the collab build, later real extensions) hang their own
+// tools here; the lite build never calls this, so nothing extra registers.
+type ExtraTools = (server: McpServer, getRepo: () => string | null) => void
+let extraTools: ExtraTools | null = null
+export function setExtraTools(fn: ExtraTools): void {
+  extraTools = fn
+}
+
 export function configureMcp(d: McpDeps): void {
   deps = d
 }
@@ -394,6 +402,8 @@ function buildServer(): McpServer {
       async () => text((await G.pull(repoOrThrow())) || 'Pulled.')
     )
   }
+
+  extraTools?.(server, () => deps?.getRepo() ?? null)
 
   return server
 }
