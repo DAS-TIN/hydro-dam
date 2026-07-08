@@ -768,6 +768,38 @@ export interface HydrodamApi {
   logStat(cwd: string, count: number): Promise<string>
   mcpStatus(): Promise<McpInfo>
   mcpSetRepo(cwd: string | null): Promise<boolean>
+  rtcProbe(cwd: string): Promise<any>
+  rtcState(cwd: string): Promise<any>
+  rtcCreate(cwd: string, opts: any): Promise<any>
+  rtcEnd(cwd: string): Promise<any>
+  rtcInviteExport(cwd: string): Promise<string | null>
+  rtcSnapshotExport(cwd: string): Promise<any>
+  rtcSnapshotVerify(srcDir: string): Promise<any>
+  rtcSnapshotImport(srcDir: string, destDir: string, guestName: string): Promise<any>
+  rtcCloneJoin(cwd: string, inviteFile: string, guestName: string): Promise<any>
+  rtcPickFile(title: string): Promise<string | null>
+  rtcManifestRefresh(cwd: string): Promise<any>
+  rtcActorAdd(cwd: string, opts: any): Promise<any>
+  rtcActorSetActive(cwd: string, actorId: string, taskId?: string | null): Promise<any>
+  rtcPresence(cwd: string, actorId: string, patch: any): Promise<any>
+  rtcTaskCreate(cwd: string, opts: any): Promise<any>
+  rtcTaskClaim(cwd: string, taskId: string, actorId: string): Promise<any>
+  rtcTaskTransition(cwd: string, taskId: string, to: string): Promise<any>
+  rtcTaskUpdate(cwd: string, taskId: string, patch: any): Promise<any>
+  rtcLockAcquire(cwd: string, opts: any): Promise<any>
+  rtcLockRelease(cwd: string, lockId: string): Promise<any>
+  rtcChangesAssign(cwd: string, paths: string[], actorId: string, taskId?: string | null): Promise<any>
+  rtcPatchCreate(cwd: string, opts: any): Promise<any>
+  rtcPatchStatus(cwd: string, patchId: string, status: string): Promise<any>
+  rtcPatchApply(cwd: string, patchId: string, checkOnly: boolean): Promise<any>
+  rtcCheckpointCreate(cwd: string, opts: any): Promise<any>
+  rtcAdvise(cwd: string): Promise<any[]>
+  rtcCommitSuggest(cwd: string, checkpointId: string): Promise<any>
+  rtcCommitApprove(cwd: string, suggestionId: string, edits: any): Promise<any>
+  rtcSettingsSet(cwd: string, patch: any): Promise<any>
+  rtcWatchStart(cwd: string): Promise<boolean>
+  rtcWatchStop(): Promise<boolean>
+  onRtcEvent(cb: (payload: any) => void): () => void
   onMenu(
     cb: (
       action: 'new-repo' | 'open-repo' | 'settings' | 'stash' | 'commit' | 'push' | 'pull' | 'fetch'

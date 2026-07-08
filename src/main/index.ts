@@ -18,6 +18,7 @@ import * as Store from './store'
 import * as Mcp from './mcp'
 import * as Templates from './templates'
 import * as Remote from './remote'
+import { registerRtcIpc } from './rtc/ipc'
 
 // Shared AI call: one system prompt + one user message, text out. Model and
 // extra instructions come from Settings; key required.
@@ -1158,3 +1159,5 @@ handle('coauthors:remove', (id: string) => {
 })
 
 handle('coauthors:known', (cwd: string) => G.knownCoauthors(cwd))
+
+registerRtcIpc()

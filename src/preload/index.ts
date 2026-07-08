@@ -273,6 +273,56 @@ const api = {
   mcpStatus: () => call<any>('mcp:status'),
   mcpSetRepo: (cwd: string | null) => call<boolean>('mcp:setRepo', cwd),
 
+  // RTC collaboration sessions
+  rtcProbe: (cwd: string) => call<any>('rtc:probe', cwd),
+  rtcState: (cwd: string) => call<any>('rtc:state', cwd),
+  rtcCreate: (cwd: string, opts: any) => call<any>('rtc:create', cwd, opts),
+  rtcEnd: (cwd: string) => call<any>('rtc:end', cwd),
+  rtcInviteExport: (cwd: string) => call<string | null>('rtc:inviteExport', cwd),
+  rtcSnapshotExport: (cwd: string) => call<any>('rtc:snapshotExport', cwd),
+  rtcSnapshotVerify: (srcDir: string) => call<any>('rtc:snapshotVerify', srcDir),
+  rtcSnapshotImport: (srcDir: string, destDir: string, guestName: string) =>
+    call<any>('rtc:snapshotImport', srcDir, destDir, guestName),
+  rtcCloneJoin: (cwd: string, inviteFile: string, guestName: string) =>
+    call<any>('rtc:cloneJoin', cwd, inviteFile, guestName),
+  rtcPickFile: (title: string) => call<string | null>('rtc:pickFile', title),
+  rtcManifestRefresh: (cwd: string) => call<any>('rtc:manifestRefresh', cwd),
+  rtcActorAdd: (cwd: string, opts: any) => call<any>('rtc:actorAdd', cwd, opts),
+  rtcActorSetActive: (cwd: string, actorId: string, taskId?: string | null) =>
+    call<any>('rtc:actorSetActive', cwd, actorId, taskId),
+  rtcPresence: (cwd: string, actorId: string, patch: any) =>
+    call<any>('rtc:presence', cwd, actorId, patch),
+  rtcTaskCreate: (cwd: string, opts: any) => call<any>('rtc:taskCreate', cwd, opts),
+  rtcTaskClaim: (cwd: string, taskId: string, actorId: string) =>
+    call<any>('rtc:taskClaim', cwd, taskId, actorId),
+  rtcTaskTransition: (cwd: string, taskId: string, to: string) =>
+    call<any>('rtc:taskTransition', cwd, taskId, to),
+  rtcTaskUpdate: (cwd: string, taskId: string, patch: any) =>
+    call<any>('rtc:taskUpdate', cwd, taskId, patch),
+  rtcLockAcquire: (cwd: string, opts: any) => call<any>('rtc:lockAcquire', cwd, opts),
+  rtcLockRelease: (cwd: string, lockId: string) => call<any>('rtc:lockRelease', cwd, lockId),
+  rtcChangesAssign: (cwd: string, paths: string[], actorId: string, taskId?: string | null) =>
+    call<any>('rtc:changesAssign', cwd, paths, actorId, taskId),
+  rtcPatchCreate: (cwd: string, opts: any) => call<any>('rtc:patchCreate', cwd, opts),
+  rtcPatchStatus: (cwd: string, patchId: string, status: string) =>
+    call<any>('rtc:patchStatus', cwd, patchId, status),
+  rtcPatchApply: (cwd: string, patchId: string, checkOnly: boolean) =>
+    call<any>('rtc:patchApply', cwd, patchId, checkOnly),
+  rtcCheckpointCreate: (cwd: string, opts: any) => call<any>('rtc:checkpointCreate', cwd, opts),
+  rtcAdvise: (cwd: string) => call<any[]>('rtc:advise', cwd),
+  rtcCommitSuggest: (cwd: string, checkpointId: string) =>
+    call<any>('rtc:commitSuggest', cwd, checkpointId),
+  rtcCommitApprove: (cwd: string, suggestionId: string, edits: any) =>
+    call<any>('rtc:commitApprove', cwd, suggestionId, edits),
+  rtcSettingsSet: (cwd: string, patch: any) => call<any>('rtc:settingsSet', cwd, patch),
+  rtcWatchStart: (cwd: string) => call<boolean>('rtc:watchStart', cwd),
+  rtcWatchStop: () => call<boolean>('rtc:watchStop'),
+  onRtcEvent: (cb: (payload: any) => void) => {
+    const listener = (_e: unknown, payload: any) => cb(payload)
+    ipcRenderer.on('rtc:event', listener)
+    return () => ipcRenderer.removeListener('rtc:event', listener)
+  },
+
   // menu-driven actions from the native application menu
   onMenu: (
     cb: (
