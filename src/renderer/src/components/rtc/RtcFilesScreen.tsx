@@ -167,7 +167,8 @@ export default function RtcFilesScreen({
       <div className="flex min-w-0 flex-1 flex-col">
         {!selected && (
           <EmptyNote>
-            Select a file to preview it. Coloured carets show where each participant's cursor is.
+            Select a file to preview it. Coloured carets show where each participant's cursor is,
+            and clicking a line moves your own caret there for everyone else.
           </EmptyNote>
         )}
         {selected && (
@@ -184,7 +185,19 @@ export default function RtcFilesScreen({
                   const here = cursors.filter((c) => c.path === selected && c.line === i + 1)
                   const c0 = here.length ? actorColor(state.actors, here[0].actorId) : null
                   return (
-                    <div key={i} className={`flex ${c0 ? c0.soft : ''}`}>
+                    <div
+                      key={i}
+                      className={`flex cursor-pointer hover:bg-ink-800/60 ${c0 ? c0.soft : ''}`}
+                      title="Click to show the others you are on this line"
+                      onClick={() => {
+                        const me = state.local.activeActorId
+                        if (me && selected) {
+                          api()
+                            .rtcPresence(cwd, me, { cursor: { path: selected, line: i + 1 }, activeFiles: [selected] })
+                            .catch((e) => toast('err', e.message))
+                        }
+                      }}
+                    >
                       <span className="w-10 shrink-0 select-none pr-2 text-right text-slate-600">{i + 1}</span>
                       <span className="whitespace-pre-wrap break-all text-slate-300">
                         {here.map((h) => {

@@ -532,6 +532,15 @@ export default function App() {
     [rtcLive]
   )
 
+  // Selecting a file in the changes list tells the session you are on it,
+  // the way an IDE shares your open editor.
+  const selPath = sel?.file?.path ?? null
+  useEffect(() => {
+    if (!__COLLAB__ || !cwd || !selPath) return
+    const me = rtcLive?.local.activeActorId
+    if (me) api().rtcPresence(cwd, me, { activeFiles: [selPath] }).catch(() => {})
+  }, [cwd, selPath])
+
   const A = api()
 
   // Re-check the repo at the moment of committing. If anything changed since the
