@@ -91,7 +91,8 @@ const SubmodulesPanel = lazy(() => import('./components/SubmodulesPanel'))
 const HelpPanel = lazy(() => import('./components/HelpPanel'))
 const DiscardsPanel = lazy(() => import('./components/DiscardsPanel'))
 const IgnoredDialog = lazy(() => import('./components/IgnoredDialog'))
-const RtcWorkspace = lazy(() => import('./components/rtc/RtcWorkspace'))
+// Compiled out of lite builds; the chunk only exists when __COLLAB__ is true.
+const RtcWorkspace = __COLLAB__ ? lazy(() => import('./components/rtc/RtcWorkspace')) : null
 const UltraCommit = lazy(() => import('./components/UltraCommit'))
 const UltraTop = lazy(() => import('./components/UltraTop'))
 const UltraFiles = lazy(() => import('./components/UltraFiles'))
@@ -1349,18 +1350,22 @@ export default function App() {
       run: () => setShowRemote(true)
     },
     { key: 'issues', label: 'Issues', icon: <IconWarning className="w-[18px] h-[18px]" />, run: () => setShowIssues(true) },
-    {
-      key: 'collab',
-      label: 'Live collab',
-      icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-          <circle cx="8" cy="8" r="3"/><circle cx="17" cy="10" r="2.4"/>
-          <path d="M2.8 19.5a5.2 5.2 0 0 1 10.4 0M13.6 17.2a4.2 4.2 0 0 1 7.6 2.3"/>
-        </svg>
-      ),
-      run: () => setShowRtc(true),
-      active: showRtc
-    }
+    ...(__COLLAB__
+      ? [
+          {
+            key: 'collab',
+            label: 'Live collab',
+            icon: (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <circle cx="8" cy="8" r="3"/><circle cx="17" cy="10" r="2.4"/>
+                <path d="M2.8 19.5a5.2 5.2 0 0 1 10.4 0M13.6 17.2a4.2 4.2 0 0 1 7.6 2.3"/>
+              </svg>
+            ),
+            run: () => setShowRtc(true),
+            active: showRtc
+          }
+        ]
+      : [])
   ]
   const railTools: RailItem[] = [
     {
@@ -2554,7 +2559,7 @@ export default function App() {
       {showInsights && (
         <InsightsPanel cwd={cwd} toast={(k, t) => toast(k, t)} onClose={() => setShowInsights(false)} />
       )}
-      {showRtc && cwd && <RtcWorkspace cwd={cwd} onClose={() => setShowRtc(false)} />}
+      {showRtc && cwd && RtcWorkspace && <RtcWorkspace cwd={cwd} onClose={() => setShowRtc(false)} />}
       {showSetups && <SetupsPanel toast={(k, t) => toast(k, t)} onClose={() => setShowSetups(false)} />}
       {showSubmodules && (
         <SubmodulesPanel
@@ -2607,7 +2612,7 @@ export default function App() {
               { label: 'Workspaces', run: () => setShowWorkspaces(true) },
               { label: 'New-repo setups', run: () => setShowSetups(true) },
               { label: 'Co-authors', run: () => setShowCoauthors(true) },
-              { label: 'Live collab session', run: () => setShowRtc(true) },
+              ...(__COLLAB__ ? [{ label: 'Live collab session', run: () => setShowRtc(true) }] : []),
               { label: 'Commit identity', run: () => setShowIdentity(true) },
               { label: 'Connections', run: () => setShowConnections(true) },
               { label: 'Settings', run: () => setShowSettings(true) },

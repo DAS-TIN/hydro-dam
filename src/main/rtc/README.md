@@ -9,6 +9,13 @@ The backend is plain ESM JavaScript (.mjs) so the exact same modules run in
 the Electron main process and under `node --test` (see test/rtc-*.test.mjs).
 Only ipc.ts touches Electron.
 
+The whole feature is compile-time optional. `npm run package:lite` builds
+installers with `__COLLAB__` set to false, which removes the rtc code, the
+rail button and the workspace from the bundle entirely; the lite installers
+get a -lite suffix and sit next to the full ones in dist/. Both flavors
+share an appId, so running the full installer over a lite install upgrades
+it in place - that is the "install the extension" story.
+
 ## Module map
 
 - util.mjs        git exec, ids, atomic JSON writes

@@ -27,6 +27,9 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run package -- --publish never
+      # Lite flavor: same app without the live-collaboration feature. Drops
+      # its installers into dist/ with a -lite suffix.
+      - run: npm run package:lite
       - uses: softprops/action-gh-release@v2
         with:
           draft: true
