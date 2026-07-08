@@ -12,6 +12,7 @@
     "types": ["node"],
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
+    "allowJs": true,
     "noEmit": true
   },
   "include": ["src"]
