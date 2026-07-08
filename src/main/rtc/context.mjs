@@ -17,7 +17,7 @@ const SAFETY_RULES = `## Safety rules
 - Never touch files in your task's forbidden list.
 - Stay inside the allowed files for your task when a list is present.
 - When you finish a coherent piece of work, suggest a checkpoint instead of continuing to pile up changes.
-- Report your position by writing .rtc/presence/<your-actor-id>.json with {"activeFiles":[],"cursor":{"path":"...","line":1},"note":"..."}.
+- Report your position by writing .rtc/presence/<your actor id with : replaced by _>.json with {"actorId":"...","activeFiles":[],"cursor":{"path":"...","line":1},"note":"..."}.
 - If the Hydrodam MCP server is connected, use its rtc_* tools instead of raw files: call rtc_guide once, then follow it for every change.`
 
 // The one workflow description every assistant sees, whether it arrives over

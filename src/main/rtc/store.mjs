@@ -94,10 +94,18 @@ export function loadState(cwd) {
   }
 }
 
+// Actor ids contain ':' which Windows cannot put in a filename (it becomes
+// an NTFS alternate data stream and the file silently disappears), so the
+// filename is sanitized and the real id travels inside the JSON.
+function presenceFile(cwd, actorId) {
+  return join(rtcDir(cwd), 'presence', `${actorId.replace(/[:/\\]/g, '_')}.json`)
+}
+
 /**
- * Presence files let external processes (a Claude Code agent working in the
- * same checkout) report what they are doing: the agent writes
- * .rtc/presence/<actorId>.json with { activeFiles, cursor: {path,line}, note }.
+ * Presence files let external processes (an assistant working in the same
+ * checkout) report what they are doing: write
+ * .rtc/presence/<actor id with : replaced by _>.json containing
+ * { actorId, activeFiles, cursor: {path,line}, note }.
  */
 export function loadPresence(cwd) {
   const dir = join(rtcDir(cwd), 'presence')
@@ -106,11 +114,11 @@ export function loadPresence(cwd) {
   for (const f of readdirSync(dir)) {
     if (!f.endsWith('.json')) continue
     const data = readJson(join(dir, f), null)
-    if (data) out[f.slice(0, -5)] = data
+    if (data) out[data.actorId || f.slice(0, -5)] = data
   }
   return out
 }
 
 export function savePresence(cwd, actorId, data) {
-  writeJson(join(rtcDir(cwd), 'presence', `${actorId}.json`), data)
+  writeJson(presenceFile(cwd, actorId), { actorId, ...data })
 }

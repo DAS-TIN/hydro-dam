@@ -2,8 +2,12 @@
 
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { addActor, humanOwnerOf, touchActor, agentsOf } from '../src/main/rtc/actors.mjs'
 import { recordChanges, assignChanges, groupChanges } from '../src/main/rtc/patches.mjs'
+import { savePresence, loadPresence } from '../src/main/rtc/store.mjs'
 
 test('actor ids are readable and unique', () => {
   const actors = []
@@ -54,6 +58,18 @@ test('changes from different actors stay attributed separately', () => {
   assignChanges(changes, ['d.ts'], 'human:bob', 'task-2')
   assert.equal(changes.find((c) => c.path === 'd.ts').actorId, 'human:bob')
   assert.equal(changes.find((c) => c.path === 'd.ts').taskId, 'task-2')
+})
+
+test('presence survives the colon in actor ids (Windows cannot store : in filenames)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'rtc-presence-'))
+  try {
+    savePresence(dir, 'agent:alice-claude', { cursor: { path: 'a.ts', line: 7 }, note: 'busy' })
+    const presence = loadPresence(dir)
+    assert.ok(presence['agent:alice-claude'], 'keyed by the real actor id, not the sanitized filename')
+    assert.equal(presence['agent:alice-claude'].cursor.line, 7)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
 })
 
 test('a re-edit of the same path keeps one entry with the latest attribution', () => {
