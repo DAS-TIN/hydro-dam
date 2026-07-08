@@ -1,12 +1,15 @@
 {
   "name": "hydrodam",
   "productName": "Hydrodam",
-  "version": "0.1.1",
+  "version": "0.2.0-test.1",
   "description": "A safer git desktop client. Commit as the right person and see exactly what you are about to commit.",
   "main": "./out/main/index.js",
   "author": "Dastin Depta",
   "license": "Apache-2.0",
-  "repository": { "type": "git", "url": "https://github.com/DAS-TIN/hydro-dam.git" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DAS-TIN/hydro-dam.git"
+  },
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
@@ -18,11 +21,33 @@
   "build": {
     "appId": "com.hydrodam.app",
     "productName": "Hydrodam",
-    "directories": { "output": "dist", "buildResources": "resources" },
-    "files": ["out/**/*", "resources/**/*"],
-    "win": { "target": ["nsis", "portable"], "icon": "resources/icon.png" },
-    "mac": { "target": "dmg", "icon": "resources/icon.png", "category": "public.app-category.developer-tools" },
-    "linux": { "target": ["AppImage"], "icon": "resources/icon.png", "category": "Development" }
+    "directories": {
+      "output": "dist",
+      "buildResources": "resources"
+    },
+    "files": [
+      "out/**/*",
+      "resources/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "resources/icon.png"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "resources/icon.png",
+      "category": "public.app-category.developer-tools"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "icon": "resources/icon.png",
+      "category": "Development"
+    }
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",
