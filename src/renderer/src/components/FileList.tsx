@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { FileEntry, NumstatEntry, RepoStatus, WorkingNumstat, basename, dirname } from '../api'
+import { CollabMark } from '../rtc'
 import { IconBlocked, IconCheck, IconChevronDown, IconChevronRight, IconArrowLeft } from './Icons'
 
 interface Props {
@@ -9,6 +10,8 @@ interface Props {
   selected: string | null
   treeView: boolean
   showIgnored: boolean
+  // per-file live-collab marks (who is on it, locks); absent outside a session
+  collab?: Map<string, CollabMark>
   onSelect: (f: FileEntry, staged: boolean) => void
   onStage: (paths: string[]) => void
   onUnstage: (paths: string[]) => void
@@ -16,6 +19,41 @@ interface Props {
   onUntrack: (path: string) => void
   onHide: (path: string, hidden: boolean) => void
   onHistory: (path: string) => void
+}
+
+/** Coloured presence dots + a lock glyph for one row of the changes list. */
+function CollabBadges({ mark }: { mark?: CollabMark }) {
+  if (!mark || (!mark.actors.length && !mark.lock)) return null
+  const lockTitle = mark.lock
+    ? `${mark.lock.hard ? 'Hard-locked' : 'Locked'} by ${mark.lock.byName}${mark.lock.reason ? `: ${mark.lock.reason}` : ''}${
+        mark.lock.mine ? ' (you hold this lock)' : ' - treat as read-only'
+      }`
+    : ''
+  return (
+    <span className="flex shrink-0 items-center gap-1">
+      {mark.actors.slice(0, 3).map((a) => (
+        <span
+          key={a.id}
+          title={`${a.name} is on this file${a.line !== undefined ? ` (line ${a.line})` : ''}`}
+          className={`h-2 w-2 rounded-full ${a.bg}`}
+        />
+      ))}
+      {mark.actors.length > 3 && <span className="text-[10px] text-slate-500">+{mark.actors.length - 3}</span>}
+      {mark.lock && (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={mark.lock.hard ? 2.6 : 1.8}
+          className={`h-3.5 w-3.5 ${mark.lock.mine ? 'text-amber-300' : 'text-bad'}`}
+        >
+          <title>{lockTitle}</title>
+          <rect x="5" y="11" width="14" height="9" rx="2" />
+          <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+        </svg>
+      )}
+    </span>
+  )
 }
 
 function badge(f: FileEntry): { letter: string; cls: string; label: string } {
@@ -55,6 +93,7 @@ function Row({
   indent = 0,
   hideDir = false,
   stat,
+  mark,
   children
 }: {
   f: FileEntry
@@ -66,6 +105,7 @@ function Row({
   indent?: number
   hideDir?: boolean
   stat?: NumstatEntry
+  mark?: CollabMark
   children?: React.ReactNode
 }) {
   const b = badge(f)
@@ -91,6 +131,7 @@ function Row({
         {!hideDir && dir && <span className="ml-1.5 text-[11px] text-slate-500">{dir}</span>}
         {f.orig && <span className="ml-1.5 inline-flex items-center gap-0.5 text-[11px] text-slate-500"><IconArrowLeft className="w-2.5 h-2.5" />{f.orig}</span>}
       </span>
+      <CollabBadges mark={mark} />
       <LineStat stat={stat} />
       <span className="hidden items-center gap-1 group-hover:flex">
         {children}
@@ -280,6 +321,7 @@ export default function FileList(props: Props) {
     <Row
       key={'c' + f.path}
       f={f}
+      mark={props.collab?.get(f.path)}
       selected={selected === f.path}
       indent={depth}
       hideDir={treeView}
@@ -294,6 +336,7 @@ export default function FileList(props: Props) {
     <Row
       key={'s' + f.path}
       f={f}
+      mark={props.collab?.get(f.path)}
       selected={selected === f.path + ':staged'}
       indent={depth}
       hideDir={treeView}
@@ -315,6 +358,7 @@ export default function FileList(props: Props) {
     <Row
       key={'u' + f.path}
       f={f}
+      mark={props.collab?.get(f.path)}
       selected={selected === f.path}
       indent={depth}
       hideDir={treeView}
@@ -352,6 +396,7 @@ export default function FileList(props: Props) {
     <Row
       key={'n' + f.path}
       f={f}
+      mark={props.collab?.get(f.path)}
       selected={selected === f.path}
       indent={depth}
       hideDir={treeView}

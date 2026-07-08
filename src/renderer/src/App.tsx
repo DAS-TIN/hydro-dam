@@ -19,6 +19,7 @@ import {
   basename,
   relTime
 } from './api'
+import { RtcState, buildCollabMarks } from './rtc'
 import FileList from './components/FileList'
 import RepoTree from './components/RepoTree'
 import FilePreview from './components/FilePreview'
@@ -277,6 +278,9 @@ export default function App() {
   const [showIdentity, setShowIdentity] = useState(false)
   const [showConflicts, setShowConflicts] = useState(false)
   const [showRtc, setShowRtc] = useState(false)
+  // Active collab session, if any, for the ambient UI: the LIVE chip by the
+  // toolbar and the per-file marks in the changes list.
+  const [rtcLive, setRtcLive] = useState<RtcState | null>(null)
   const [ignoredFiles, setIgnoredFiles] = useState<IgnoredFileSets | null>(null)
   const [ignoredDialog, setIgnoredDialog] = useState<'gitignore' | 'local' | 'global' | null>(null)
   // New-repository dialog. initPath set => initialise that existing folder in place.
@@ -497,6 +501,36 @@ export default function App() {
     if (!cwd) { setIgnoredFiles(null); return }
     api().excludesListIgnored(cwd).then(setIgnoredFiles).catch(() => {})
   }, [cwd])
+
+  // Track the repo's collab session for the ambient UI. The watcher is kept
+  // running so presence and attribution flow with the workspace closed.
+  useEffect(() => {
+    if (!__COLLAB__ || !cwd) {
+      setRtcLive(null)
+      return
+    }
+    let gone = false
+    const load = () =>
+      api()
+        .rtcState(cwd)
+        .then((s) => {
+          if (gone) return
+          setRtcLive(s?.session?.status === 'active' ? s : null)
+          if (s?.session?.status === 'active') api().rtcWatchStart(cwd).catch(() => {})
+        })
+        .catch(() => { if (!gone) setRtcLive(null) })
+    load()
+    const off = api().onRtcEvent((ev) => { if (ev.cwd === cwd) load() })
+    return () => {
+      gone = true
+      off()
+    }
+  }, [cwd])
+
+  const collabMarks = useMemo(
+    () => (__COLLAB__ && rtcLive ? buildCollabMarks(rtcLive) : null),
+    [rtcLive]
+  )
 
   const A = api()
 
@@ -1627,6 +1661,39 @@ export default function App() {
           </button>
         )}
 
+        {__COLLAB__ && rtcLive && (() => {
+          const humans = rtcLive.actors.filter((a) => a.type === 'human')
+          const bots = rtcLive.actors.filter((a) => a.type === 'agent')
+          const who = humans
+            .map((h) => {
+              const own = bots.filter((b) => b.humanOwnerActorId === h.id).map((b) => b.displayName)
+              return h.displayName + (own.length ? ` (AI: ${own.join(', ')})` : '')
+            })
+            .join('\n')
+          return (
+            <button
+              className="flex items-center gap-2 rounded-md border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-xs text-slate-300 hover:border-red-400/60"
+              onClick={() => setShowRtc(true)}
+              title={`Live collaboration session\n${who}\n\nClick to open the workspace`}
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-60" style={{ animationDuration: '2.4s' }} />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+              </span>
+              <span className="font-semibold uppercase tracking-wide text-red-300">Live</span>
+              <span className="max-w-40 truncate">
+                {humans.length <= 2 ? humans.map((h) => h.displayName).join(', ') : `${humans.length} users`}
+              </span>
+              {bots.length > 0 && (
+                <>
+                  <span className="text-slate-600">/</span>
+                  <span>{bots.length} AI</span>
+                </>
+              )}
+            </button>
+          )
+        })()}
+
         <div className="flex-1" />
 
         <button
@@ -1886,6 +1953,7 @@ export default function App() {
                 selected={selKey}
                 treeView={settings.treeView}
                 showIgnored={settings.showIgnored}
+                collab={collabMarks ?? undefined}
                 onSelect={selectFile}
                 onStage={stagePaths}
                 onUnstage={unstagePaths}

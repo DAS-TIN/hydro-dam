@@ -269,3 +269,59 @@ export function taskProgress(task: RtcTask, patches: RtcPatch[]): number {
 export function actorShort(id: string): string {
   return id.includes(':') ? id.split(':')[1] : id
 }
+
+// Per-file collaboration marks for the MAIN changes list: who is on a file
+// (dot colour, cursor line when known) and whether it is locked.
+export interface CollabMark {
+  actors: { id: string; name: string; bg: string; line?: number }[]
+  lock?: { by: string; byName: string; reason: string; hard: boolean; mine: boolean }
+}
+
+export function buildCollabMarks(state: RtcState): Map<string, CollabMark> {
+  const marks = new Map<string, CollabMark>()
+  const mark = (p: string) => {
+    let m = marks.get(p)
+    if (!m) {
+      m = { actors: [] }
+      marks.set(p, m)
+    }
+    return m
+  }
+  const nameOf = (id: string) => state.actors.find((a) => a.id === id)?.displayName || actorShort(id)
+  const touch = (path: string, id: string, line?: number) => {
+    if (!id || id === 'unknown') return
+    const m = mark(path.replace(/\\/g, '/'))
+    const existing = m.actors.find((a) => a.id === id)
+    if (existing) {
+      if (line !== undefined) existing.line = line
+      return
+    }
+    m.actors.push({ id, name: nameOf(id), bg: actorColor(state.actors, id).bg, ...(line !== undefined ? { line } : {}) })
+  }
+
+  for (const c of state.changes) touch(c.path, c.actorId)
+  for (const a of state.actors) {
+    for (const f of a.activeFiles || []) touch(f, a.id)
+    if (a.cursor) touch(a.cursor.path, a.id, a.cursor.line)
+  }
+  for (const [id, p] of Object.entries(state.presence)) {
+    for (const f of p.activeFiles || []) touch(f, id)
+    if (p.cursor) touch(p.cursor.path, id, p.cursor.line)
+  }
+
+  const now = Date.now()
+  for (const l of state.locks) {
+    if (l.releasedAt || (l.expiresAt && l.expiresAt <= now)) continue
+    const m = mark(l.path)
+    // a hard lock wins over a soft one on the same path
+    if (m.lock && m.lock.hard && !l.hardLock) continue
+    m.lock = {
+      by: l.lockedByActorId,
+      byName: nameOf(l.lockedByActorId),
+      reason: l.reason || '',
+      hard: l.hardLock,
+      mine: l.lockedByActorId === state.local.activeActorId
+    }
+  }
+  return marks
+}

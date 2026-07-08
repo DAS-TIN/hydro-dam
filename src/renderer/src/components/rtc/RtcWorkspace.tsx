@@ -121,7 +121,8 @@ export default function RtcWorkspace({ cwd, onClose }: { cwd: string; onClose: (
                   .filter((a) => a.type !== 'system')
                   .map((a) => (
                     <option key={a.id} value={a.id}>
-                      {a.displayName} ({a.type === 'agent' ? 'assistant' : a.type})
+                      {a.displayName}
+                      {a.type !== 'human' ? ` (${a.type === 'agent' ? 'assistant' : a.type})` : ''}
                     </option>
                   ))}
               </select>
