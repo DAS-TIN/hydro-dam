@@ -83,8 +83,8 @@ export default function CoauthorPanel({
               >
                 <Toggle on={c.enabled} onClick={() => toggle(c)} />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium text-slate-100">{c.name}</div>
-                  <div className="truncate text-xs text-slate-500">{c.email}</div>
+                  <div className="truncate text-base font-medium text-slate-100">{c.name}</div>
+                  <div className="truncate text-sm text-slate-500">{c.email}</div>
                 </div>
                 <button
                   onClick={() => remove(c)}
@@ -98,7 +98,7 @@ export default function CoauthorPanel({
 
           {suggestions.length > 0 && (
             <div className="mt-4">
-              <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Found in this repo's history
               </div>
               <div className="flex flex-wrap gap-1.5">
@@ -138,7 +138,7 @@ export default function CoauthorPanel({
               Add
             </button>
           </div>
-          <div className="mt-2 text-[11px] text-slate-500">
+          <div className="mt-2 text-xs text-slate-500">
             {enabledCount} of {coauthors.length} active - they'll co-sign your next commit.
           </div>
         </div>

@@ -896,7 +896,7 @@ export default function App() {
         return
       }
       if (inText) return
-      if (focusRegion !== 'files') { setFocusRegion('files'); return }
+      if (kbNav) { setKbNav(false); return }
       if (sel) setSel(null)
       return
     }
@@ -1671,6 +1671,11 @@ export default function App() {
             </span>
           ))}
           <span className="flex-1" />
+          {!ultra && (
+            <span className="text-ink-500">
+              <span className="font-mono text-slate-400">Esc</span> {focusLock ? 'unlock' : 'leave focus'}
+            </span>
+          )}
           <span className="text-ink-500">
             <span className="font-mono text-slate-400">Tab</span> {focusLock ? 'moves inside' : 'next area'}
           </span>
@@ -2191,7 +2196,7 @@ export default function App() {
             >
               <span className="font-medium shrink-0">Co-authors</span>
               {activeCo.length === 0 ? (
-                <span className="flex-1 text-ink-500">none active</span>
+                <span className="flex-1 text-ink-500">No co-authors active</span>
               ) : (
                 <span className="flex flex-1 flex-wrap gap-1">
                   {activeCo.slice(0, 2).map((c) => (
