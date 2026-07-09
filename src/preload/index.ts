@@ -63,7 +63,7 @@ const api = {
   lfsTrack: (cwd: string, pattern: string) => call<string>('lfs:track', cwd, pattern),
   lfsPull: (cwd: string) => call<string>('lfs:pull', cwd),
   logGraph: (cwd: string, q: any) => call<any[]>('log:graph', cwd, q),
-  blame: (cwd: string, path: string) => call<any[]>('blame', cwd, path),
+  blame: (cwd: string, path: string, rev?: string) => call<any[]>('blame', cwd, path, rev),
 
   //commit actions
   cherryPick: (cwd: string, hash: string) => call<string>('commit:cherryPick', cwd, hash),

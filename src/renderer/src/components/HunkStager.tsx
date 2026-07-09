@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { api } from '../api'
-import { LiveLineMark, timeAgo } from '../rtc'
+import { api, BlameLine } from '../api'
+import { ACTOR_COLORS, ActorColor, LiveLineMark, liveLabelClass, timeAgo } from '../rtc'
 import Avatar from './Avatar'
 
 interface Hunk {
   header: string
-  // body lines paired with their selectable index (-1 for context/meta) and,
-  // for context/added lines, their line number in the new file
-  lines: { text: string; tag: ' ' | '+' | '-' | '\\'; selIdx: number; newNo?: number }[]
+  // body lines paired with their selectable index (-1 for context/meta) and
+  // their line numbers: newNo in the new file (context/added), oldNo in the
+  // old file (context/removed)
+  lines: { text: string; tag: ' ' | '+' | '-' | '\\'; selIdx: number; newNo?: number; oldNo?: number }[]
 }
 
 // selIdx must match how the backend counts body lines when it rebuilds the patch
@@ -22,6 +23,7 @@ function parse(text: string): { fileHeader: string[]; hunks: Hunk[] } {
   let cur: Hunk | null = null
   let selIdx = -1
   let newNo = 0
+  let oldNo = 0
   for (let i = first; i < all.length; i++) {
     const l = all[i]
     if (l.startsWith('@@')) {
@@ -29,6 +31,7 @@ function parse(text: string): { fileHeader: string[]; hunks: Hunk[] } {
       cur = { header: l, lines: [] }
       selIdx = -1
       newNo = parseInt(l.match(/\+(\d+)/)?.[1] ?? '0', 10)
+      oldNo = parseInt(l.match(/^@@ -(\d+)/)?.[1] ?? '0', 10)
       continue
     }
     if (!cur) continue
@@ -37,6 +40,7 @@ function parse(text: string): { fileHeader: string[]; hunks: Hunk[] } {
       selIdx++
       const line: Hunk['lines'][number] = { text: l, tag: c as ' ' | '+' | '-', selIdx }
       if (c !== '-') line.newNo = newNo++
+      if (c !== '+') line.oldNo = oldNo++
       cur.lines.push(line)
     } else if (c === '\\') {
       cur.lines.push({ text: l, tag: '\\', selIdx: -1 })
@@ -64,6 +68,7 @@ export default function HunkStager({
   staged,
   text,
   live,
+  headBlame,
   toast,
   onChanged
 }: {
@@ -73,6 +78,8 @@ export default function HunkStager({
   text: string
   // per-line live-collab attribution: colours added lines by who wrote them
   live?: Map<number, LiveLineMark>
+  // blame of HEAD keyed by old line number: who wrote what a removed line replaces
+  headBlame?: Map<number, BlameLine>
   toast: (kind: 'ok' | 'err' | 'info', text: string) => void
   onChanged: () => void
 }) {
@@ -80,6 +87,16 @@ export default function HunkStager({
   // selected changed-line indices, per hunk
   const [sel, setSel] = useState<Record<number, Set<number>>>({})
   const [busy, setBusy] = useState(false)
+
+  // Stable colour per commit author for the "was ..." labels, same idea as
+  // the blame panel's palette.
+  const authorColors = useMemo(() => {
+    const m = new Map<string, ActorColor>()
+    for (const b of headBlame?.values() ?? []) {
+      if (!m.has(b.author)) m.set(b.author, ACTOR_COLORS[m.size % ACTOR_COLORS.length])
+    }
+    return m
+  }, [headBlame])
 
   useEffect(() => setSel({}), [text])
 
@@ -131,7 +148,7 @@ export default function HunkStager({
               {who.map((m) => (
                 <span key={m.name} className="flex shrink-0 items-center gap-1 text-[10px] text-slate-400">
                   <Avatar name={m.name} bg={m.color.bg} size={14} />
-                  <span className={m.color.text}>{m.name}</span> {timeAgo(m.at)}
+                  <span className={m.color.text}>{m.name}</span> <span className="live-when">{timeAgo(m.at)}</span>
                 </span>
               ))}
               <span className="flex-1" />
@@ -152,8 +169,9 @@ export default function HunkStager({
               const changed = ln.tag === '+' || ln.tag === '-'
               const selected = changed && (sel[h]?.has(ln.selIdx) ?? false)
               const bg =
-                ln.tag === '+' ? 'diff-add' : ln.tag === '-' ? 'diff-del' : ln.tag === '\\' ? 'diff-meta' : 'text-slate-300'
+                ln.tag === '+' ? 'diff-add' : ln.tag === '-' ? 'diff-del' : ln.tag === '\\' ? 'diff-meta' : 'text-slate-200'
               const mark = ln.tag === '+' && ln.newNo !== undefined ? live?.get(ln.newNo) : undefined
+              const was = ln.tag === '-' && ln.oldNo !== undefined ? headBlame?.get(ln.oldNo) : undefined
               return (
                 <div
                   key={i}
@@ -166,10 +184,31 @@ export default function HunkStager({
                   {!!live?.size && (
                     <span className={`w-[3px] shrink-0 self-stretch ${mark ? mark.color.bg : ''}`} />
                   )}
+                  {/* real file line numbers: old on the left, new on the right */}
+                  <span className="w-9 shrink-0 select-none pr-1 text-right text-slate-500">{ln.oldNo ?? ''}</span>
+                  <span className="w-9 shrink-0 select-none pr-2 text-right text-slate-200">{ln.newNo ?? ''}</span>
                   <span className="mr-2 inline-block w-3 shrink-0 select-none text-center text-[10px] text-slate-500">
                     {changed ? (selected ? 'x' : '+') : ''}
                   </span>
                   <span className="whitespace-pre">{ln.text === '' ? ' ' : ln.text}</span>
+                  <span className="flex-1" />
+                  {mark && (
+                    <span className="flex shrink-0 select-none items-center gap-1.5 self-center pl-6 pr-3 text-[11px] italic">
+                      <Avatar name={mark.name} bg={mark.color.bg} size={12} />
+                      <span className={liveLabelClass(mark.color.name)}>{mark.name}</span>
+                      <span className="live-when">{timeAgo(mark.at)}</span>
+                    </span>
+                  )}
+                  {was && (
+                    <span
+                      className="flex shrink-0 select-none items-center gap-1.5 self-center pl-6 pr-3 text-[11px] italic"
+                      title={`${was.shortHash} - what this line said before this change`}
+                    >
+                      <Avatar name={was.author} bg={(authorColors.get(was.author) ?? ACTOR_COLORS[0]).bg} size={12} />
+                      <span className="live-label">was {was.author}</span>
+                      <span className="live-when">{was.date}</span>
+                    </span>
+                  )}
                 </div>
               )
             })}

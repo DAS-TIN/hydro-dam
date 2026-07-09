@@ -619,7 +619,7 @@ export interface HydrodamApi {
   lfsTrack(cwd: string, pattern: string): Promise<string>
   lfsPull(cwd: string): Promise<string>
   logGraph(cwd: string, q: LogQuery): Promise<GraphCommit[]>
-  blame(cwd: string, path: string): Promise<BlameLine[]>
+  blame(cwd: string, path: string, rev?: string): Promise<BlameLine[]>
   cherryPick(cwd: string, hash: string): Promise<string>
   revertCommit(cwd: string, hash: string): Promise<string>
   resetTo(cwd: string, hash: string, mode: 'soft' | 'mixed' | 'hard'): Promise<void>

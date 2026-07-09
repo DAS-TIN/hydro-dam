@@ -4,6 +4,7 @@ import {
   confirmDialog,
   RepoStatus,
   FileEntry,
+  BlameLine,
   Coauthor,
   CoauthorViolation,
   Branch,
@@ -201,6 +202,9 @@ export default function App() {
   const [sel, setSel] = useState<{ file: FileEntry; staged: boolean } | null>(null)
   const [diff, setDiff] = useState('')
   const [meta, setMeta] = useState<Record<string, string>>({})
+  // HEAD blame for the selected file, keyed by line number - feeds the
+  // "was <author>" labels on removed diff lines
+  const [headBlame, setHeadBlame] = useState<Map<number, BlameLine> | null>(null)
   // How the selected change is shown: its diff, the file itself, or rendered markdown.
   const [viewTab, setViewTab] = useState<'diff' | 'file' | 'preview'>('diff')
 
@@ -429,6 +433,7 @@ export default function App() {
     if (!cwd || !sel) {
       setDiff('')
       setMeta({})
+      setHeadBlame(null)
       return
     }
     const { file, staged } = sel
@@ -445,13 +450,28 @@ export default function App() {
         .fileMeta(cwd, file.path)
         .then((m) => seq === diffSeq.current && setMeta(m))
         .catch(() => {})
+      // who wrote the lines this diff replaces, for the "was ..." labels
+      if (file.untracked) setHeadBlame(null)
+      else
+        api()
+          .blame(cwd, file.path, 'HEAD')
+          .then((ls) => {
+            if (seq !== diffSeq.current) return
+            setHeadBlame(new Map(ls.map((l) => [l.lineNo, l])))
+          })
+          .catch(() => seq === diffSeq.current && setHeadBlame(null))
     }, 120)
     return () => clearTimeout(t)
   }, [cwd, sel, status])
 
   function selectFile(file: FileEntry, staged: boolean) {
     setPreviewPath(null)
-    if (sel?.file.path !== file.path) setViewTab('diff')
+    if (sel?.file.path !== file.path) {
+      // during a live session a file someone is editing opens IDE-first:
+      // the File view with tints, carets and labels; Diff stays one click away
+      const hasLive = __COLLAB__ && !!rtcLive?.liveblame?.some((s) => s.path === file.path)
+      setViewTab(hasLive ? 'file' : 'diff')
+    }
     setSel({ file, staged })
   }
 
@@ -1746,12 +1766,12 @@ export default function App() {
         </button>
         {status && status.ahead > 0 && (
           <button
-            className="btn-ghost"
+            className="btn-soft"
             disabled={busy}
             onClick={() => setShowPushPreview(true)}
-            title="Review the commits you're about to push, with their co-authors"
+            title="Step one before pushing: read each unpushed commit's diff, amend the message, or revert"
           >
-            Review
+            Review {status.ahead}
           </button>
         )}
         <button
@@ -2156,6 +2176,13 @@ export default function App() {
               {/* who else is on this file right now, IDE-style */}
               {__COLLAB__ && collabMarks?.get(sel.file.path) && (() => {
                 const m = collabMarks.get(sel.file.path)!
+                // which uncommitted lines each participant owns right now
+                const ranges = new Map<string, string>()
+                for (const s of rtcLive?.liveblame ?? []) {
+                  if (s.path !== sel.file.path) continue
+                  const r = s.startLine === s.endLine ? `${s.startLine}` : `${s.startLine}-${s.endLine}`
+                  ranges.set(s.actorId, ranges.has(s.actorId) ? `${ranges.get(s.actorId)}, ${r}` : r)
+                }
                 return (
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-ink-800 bg-ink-850/60 px-4 py-1.5">
                     {m.actors.map((a) => (
@@ -2163,6 +2190,9 @@ export default function App() {
                         <Avatar name={a.name} bg={a.bg} size={16} />
                         <span className={`font-medium ${a.text}`}>{a.name}</span>
                         <span className="text-slate-400">{presenceLabel(a)}</span>
+                        {ranges.has(a.id) && (
+                          <span className="live-when select-none">lines {ranges.get(a.id)}</span>
+                        )}
                       </span>
                     ))}
                     {m.lock && (
@@ -2209,6 +2239,7 @@ export default function App() {
                     staged={sel.staged}
                     text={diff}
                     live={liveMarks ?? undefined}
+                    headBlame={headBlame ?? undefined}
                     toast={(k, t) => toast(k, t)}
                     onChanged={() => refresh()}
                   />

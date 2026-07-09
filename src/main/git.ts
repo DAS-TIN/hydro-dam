@@ -1036,8 +1036,10 @@ export interface BlameLine {
  * wire but means each line is self-contained and the parser below never has to carry
  * commit info forward from one line to the next.
  */
-export async function blame(cwd: string, path: string): Promise<BlameLine[]> {
-  const raw = await git(cwd, ['blame', '--line-porcelain', '--', path])
+export async function blame(cwd: string, path: string, rev?: string): Promise<BlameLine[]> {
+  // rev (e.g. HEAD) blames that revision instead of the working tree, which
+  // is how the diff view finds who wrote a line that is being replaced.
+  const raw = await git(cwd, rev ? ['blame', '--line-porcelain', rev, '--', path] : ['blame', '--line-porcelain', '--', path])
   const out: BlameLine[] = []
   let cur: { hash: string; author: string; date: string; lineNo: number } | null = null
   for (const l of raw.split('\n')) {

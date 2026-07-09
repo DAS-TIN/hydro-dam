@@ -576,7 +576,7 @@ handle('lfs:info', (cwd: string) => G.lfsInfo(cwd))
 handle('lfs:track', (cwd: string, pattern: string) => G.lfsTrack(cwd, pattern))
 handle('lfs:pull', (cwd: string) => G.lfsPull(cwd))
 handle('log:graph', (cwd: string, q: G.LogQuery) => G.logGraph(cwd, q ?? {}))
-handle('blame', (cwd: string, path: string) => G.blame(cwd, path))
+handle('blame', (cwd: string, path: string, rev?: string) => G.blame(cwd, path, rev))
 
 handle('commit:cherryPick', (cwd: string, hash: string) => G.cherryPick(cwd, hash))
 handle('commit:revert', (cwd: string, hash: string) => G.revertCommit(cwd, hash))
