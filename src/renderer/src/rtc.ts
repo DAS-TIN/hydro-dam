@@ -240,6 +240,12 @@ const GRAY: ActorColor = {
   border: 'border-slate-400/40'
 }
 
+// Attribution labels sit on tinted rows: neon yellow reads everywhere except
+// on the yellowish tints, which get the neon cyan alternative.
+export function liveLabelClass(colorName: string): string {
+  return colorName === 'amber' || colorName === 'lime' ? 'live-label-alt' : 'live-label'
+}
+
 export function actorColor(actors: RtcActor[], actorId: string | null | undefined): ActorColor {
   if (!actorId || actorId === 'unknown') return GRAY
   const i = actors.findIndex((a) => a.id === actorId)

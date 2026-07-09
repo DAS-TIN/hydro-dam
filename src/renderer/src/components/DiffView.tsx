@@ -94,7 +94,7 @@ function parse(text: string): Line[] {
 const lineClass: Record<Kind, string> = {
   meta: 'diff-line diff-meta',
   hunk: 'diff-line diff-hunk',
-  context: 'diff-line text-slate-300',
+  context: 'diff-line text-slate-200',
   del: 'diff-line diff-del',
   add: 'diff-line diff-add'
 }

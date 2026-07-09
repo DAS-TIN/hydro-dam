@@ -113,6 +113,18 @@ body {
 .live-tinted .tok-com {
   color: #45f884;
 }
+/* Inline attribution labels (file, diff and blame views). Neon so they read
+   over any row tint; -alt swaps in for yellowish tints (amber/lime actors)
+   where neon yellow would sink. Times get their own colour. */
+.live-label {
+  color: #f5ef5a;
+}
+.live-label-alt {
+  color: #57f2df;
+}
+.live-when {
+  color: #c4b5fd;
+}
 .tok-num {
   color: #f0b464;
 }

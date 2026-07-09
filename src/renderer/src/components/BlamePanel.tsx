@@ -132,7 +132,7 @@ export default function BlamePanel({
                       <>
                         <Avatar name={a.name} bg={a.color.bg} size={15} title={title} />
                         <span className={`truncate ${a.color.text}`}>{a.name}</span>
-                        {a.at !== undefined && <span className="shrink-0">{timeAgo(a.at)}</span>}
+                        {a.at !== undefined && <span className="live-when shrink-0">{timeAgo(a.at)}</span>}
                       </>
                     ) : (
                       <>
@@ -142,8 +142,8 @@ export default function BlamePanel({
                       </>
                     )}
                   </span>
-                  <span className="w-12 shrink-0 select-none px-2 text-right text-slate-600">{l.lineNo}</span>
-                  <span className={`whitespace-pre px-2 ${a.live ? 'text-slate-100' : 'text-slate-300'}`}>
+                  <span className="w-12 shrink-0 select-none px-2 text-right text-slate-300">{l.lineNo}</span>
+                  <span className={`whitespace-pre px-2 ${a.live ? 'text-slate-100' : 'text-slate-200'}`}>
                     {l.content === '' ? ' ' : l.content}
                   </span>
                 </div>

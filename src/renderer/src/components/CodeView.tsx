@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { highlight, extOf } from '../highlight'
-import { LiveCursor, LiveLineMark, timeAgo } from '../rtc'
+import { LiveCursor, LiveLineMark, liveLabelClass, timeAgo } from '../rtc'
 import Avatar from './Avatar'
 
 /** Read-only code view: line-number gutter plus syntax highlighting.
@@ -30,8 +30,9 @@ export default function CodeView({
 
   const editLabel = (m: LiveLineMark) =>
     m.startLine === m.endLine
-      ? `${m.name} last edited this line ${timeAgo(m.at)}`
-      : `${m.name} last edited lines ${m.startLine}-${m.endLine} ${timeAgo(m.at)}`
+      ? `${m.name} last edited this line`
+      : `${m.name} last edited lines ${m.startLine}-${m.endLine}`
+  const labelClass = (m: LiveLineMark) => liveLabelClass(m.color.name)
 
   return (
     <div className="min-w-max py-2 font-mono text-[12.5px] leading-[1.55] select-text">
@@ -42,16 +43,16 @@ export default function CodeView({
         return (
           <React.Fragment key={i}>
             <div
-              title={mark && !mark.first ? editLabel(mark) : undefined}
+              title={mark && !mark.first ? `${editLabel(mark)} ${timeAgo(mark.at)}` : undefined}
               className={`flex hover:bg-ink-850/60 ${mark ? `live-tinted ${mark.recent ? mark.color.strong : mark.color.soft}` : ''}`}
             >
               <span
-                className="sticky left-0 flex shrink-0 select-none items-center justify-end gap-1 border-r border-ink-800 bg-ink-900 pr-2.5 text-right text-ink-600"
+                className="sticky left-0 flex shrink-0 select-none items-center justify-end gap-1 border-r border-ink-800 bg-ink-900 pr-2.5 text-right text-slate-300"
                 style={{ minWidth: `${gutterCh}ch` }}
               >
                 {mark?.first && (
                   <button
-                    title={`${editLabel(mark)} - click for line history`}
+                    title={`${editLabel(mark)} ${timeAgo(mark.at)} - click for line history`}
                     onClick={() => setOpenHist(unfolded ? null : mark.startLine)}
                   >
                     <Avatar name={mark.name} bg={mark.color.bg} size={13} />
@@ -80,17 +81,20 @@ export default function CodeView({
                       )
                     )}
               </span>
-              {mark?.first && (
+              <span className="flex-1" />
+              {mark?.first ? (
                 // IDE-style inline attribution: informational only, never part of a copy
                 <span
-                  className="cursor-pointer select-none self-center whitespace-nowrap pl-8 pr-6 text-[11px] italic text-slate-600 hover:text-slate-400"
+                  className="cursor-pointer select-none self-center whitespace-nowrap pl-8 pr-4 text-[11px] italic"
                   title="Click for line history"
                   onClick={() => setOpenHist(unfolded ? null : mark.startLine)}
                 >
-                  {editLabel(mark)}
+                  <span className={labelClass(mark)}>{editLabel(mark)}</span>{' '}
+                  <span className="live-when">{timeAgo(mark.at)}</span>
                 </span>
+              ) : (
+                <span className="pr-6" />
               )}
-              {!mark?.first && <span className="pr-6" />}
             </div>
             {unfolded && (
               <div className="flex select-text">
