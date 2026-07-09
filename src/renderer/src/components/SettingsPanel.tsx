@@ -15,7 +15,8 @@ const ROWS: { key: keyof Settings; label: string; hint: string }[] = [
   { key: 'showLegend', label: 'Show colour key', hint: 'The legend of status colours under the file list.' },
   { key: 'treeView', label: 'Folder tree view', hint: 'Group changed files by folder instead of a flat list.' },
   { key: 'showOpStatus', label: 'Show last fetch / pull / push', hint: 'A status strip with the time of your last remote operations.' },
-  { key: 'showIgnored', label: 'Show ignored files', hint: 'List .gitignore-matched files in their own section.' }
+  { key: 'showIgnored', label: 'Show ignored files', hint: 'List .gitignore-matched files in their own section.' },
+  { key: 'liveBrackets', label: 'Bracket live-edit labels', hint: 'Multi-line live edits get a bracket down their right side with the who/when label at its middle. Off: label on the first line.' }
 ]
 
 export default function SettingsPanel({

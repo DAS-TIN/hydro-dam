@@ -154,7 +154,8 @@ const DEFAULT_SETTINGS: Settings = {
   aiModel: 'claude-opus-4-8',
   aiInstructions: '',
   uiZoom: 100,
-  secretScanOnPush: false
+  secretScanOnPush: false,
+  liveBrackets: true
 }
 
 function SplashScreen({ onDone }: { onDone: () => void }) {
@@ -2221,6 +2222,7 @@ export default function App() {
                     editable
                     live={liveMarks ?? undefined}
                     cursors={liveCursors ?? undefined}
+                    brackets={settings.liveBrackets}
                     refreshKey={__COLLAB__ ? rtcLive : undefined}
                     toast={(k, t) => toast(k, t)}
                     onSaved={() => refresh()}

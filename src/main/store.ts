@@ -45,6 +45,9 @@ export interface Settings {
   uiZoom: number
   // Warn before pushing when outgoing commits contain key-shaped strings.
   secretScanOnPush: boolean
+  // Multi-line live-blame labels draw as a bracket spanning the edited lines
+  // with the label at its middle; off = a plain label on the first line.
+  liveBrackets: boolean
 }
 
 // Reusable set of ignore patterns Hydrodam can seed into repositories. "private" goes
@@ -178,7 +181,8 @@ const defaultSettings: Settings = {
   aiModel: 'claude-opus-4-8',
   aiInstructions: '',
   uiZoom: 100,
-  secretScanOnPush: false
+  secretScanOnPush: false,
+  liveBrackets: true
 }
 
 // Default private excludes for a fresh repo: local tool config that should stay

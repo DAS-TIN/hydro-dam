@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { api, BlameLine } from '../api'
-import { ACTOR_COLORS, ActorColor, LiveLineMark, liveLabelClass, timeAgo } from '../rtc'
+import { ACTOR_COLORS, ActorColor, LiveLineMark, timeAgo } from '../rtc'
 import Avatar from './Avatar'
 
 interface Hunk {
@@ -195,7 +195,7 @@ export default function HunkStager({
                   {mark && (
                     <span className="flex shrink-0 select-none items-center gap-1.5 self-center pl-6 pr-3 text-[11px] italic">
                       <Avatar name={mark.name} bg={mark.color.bg} size={12} />
-                      <span className={liveLabelClass(mark.color.name)}>{mark.name}</span>
+                      <span className={mark.color.text}>{mark.name}</span>
                       <span className="live-when">{timeAgo(mark.at)}</span>
                     </span>
                   )}
@@ -205,7 +205,8 @@ export default function HunkStager({
                       title={`${was.shortHash} - what this line said before this change`}
                     >
                       <Avatar name={was.author} bg={(authorColors.get(was.author) ?? ACTOR_COLORS[0]).bg} size={12} />
-                      <span className="live-label">was {was.author}</span>
+                      <span className="live-label">was</span>
+                      <span className={(authorColors.get(was.author) ?? ACTOR_COLORS[0]).text}>{was.author}</span>
                       <span className="live-when">{was.date}</span>
                     </span>
                   )}

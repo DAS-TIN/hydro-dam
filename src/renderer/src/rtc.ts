@@ -214,20 +214,22 @@ export interface ActorColor {
   soft: string
   strong: string
   border: string
+  edge: string
 }
 
 // One stable colour per actor so "who did what" reads at a glance everywhere.
 // soft/strong are the two highlight shades: strong for edits from the last
-// few minutes, soft for older uncommitted ones.
+// few minutes, soft for older uncommitted ones. border is the quiet frame
+// tone; edge is the stronger one the segment brackets are drawn with.
 export const ACTOR_COLORS: ActorColor[] = [
-  { name: 'emerald', text: 'text-emerald-400', bg: 'bg-emerald-400', soft: 'bg-emerald-400/15', strong: 'bg-emerald-400/30', border: 'border-emerald-400/40' },
-  { name: 'sky', text: 'text-sky-400', bg: 'bg-sky-400', soft: 'bg-sky-400/15', strong: 'bg-sky-400/30', border: 'border-sky-400/40' },
-  { name: 'violet', text: 'text-violet-400', bg: 'bg-violet-400', soft: 'bg-violet-400/15', strong: 'bg-violet-400/30', border: 'border-violet-400/40' },
-  { name: 'amber', text: 'text-amber-400', bg: 'bg-amber-400', soft: 'bg-amber-400/15', strong: 'bg-amber-400/30', border: 'border-amber-400/40' },
-  { name: 'rose', text: 'text-rose-400', bg: 'bg-rose-400', soft: 'bg-rose-400/15', strong: 'bg-rose-400/30', border: 'border-rose-400/40' },
-  { name: 'cyan', text: 'text-cyan-400', bg: 'bg-cyan-400', soft: 'bg-cyan-400/15', strong: 'bg-cyan-400/30', border: 'border-cyan-400/40' },
-  { name: 'lime', text: 'text-lime-400', bg: 'bg-lime-400', soft: 'bg-lime-400/15', strong: 'bg-lime-400/30', border: 'border-lime-400/40' },
-  { name: 'fuchsia', text: 'text-fuchsia-400', bg: 'bg-fuchsia-400', soft: 'bg-fuchsia-400/15', strong: 'bg-fuchsia-400/30', border: 'border-fuchsia-400/40' }
+  { name: 'emerald', text: 'text-emerald-400', bg: 'bg-emerald-400', soft: 'bg-emerald-400/15', strong: 'bg-emerald-400/30', border: 'border-emerald-400/40', edge: 'border-emerald-400/80' },
+  { name: 'sky', text: 'text-sky-400', bg: 'bg-sky-400', soft: 'bg-sky-400/15', strong: 'bg-sky-400/30', border: 'border-sky-400/40', edge: 'border-sky-400/80' },
+  { name: 'violet', text: 'text-violet-400', bg: 'bg-violet-400', soft: 'bg-violet-400/15', strong: 'bg-violet-400/30', border: 'border-violet-400/40', edge: 'border-violet-400/80' },
+  { name: 'amber', text: 'text-amber-400', bg: 'bg-amber-400', soft: 'bg-amber-400/15', strong: 'bg-amber-400/30', border: 'border-amber-400/40', edge: 'border-amber-400/80' },
+  { name: 'rose', text: 'text-rose-400', bg: 'bg-rose-400', soft: 'bg-rose-400/15', strong: 'bg-rose-400/30', border: 'border-rose-400/40', edge: 'border-rose-400/80' },
+  { name: 'cyan', text: 'text-cyan-400', bg: 'bg-cyan-400', soft: 'bg-cyan-400/15', strong: 'bg-cyan-400/30', border: 'border-cyan-400/40', edge: 'border-cyan-400/80' },
+  { name: 'lime', text: 'text-lime-400', bg: 'bg-lime-400', soft: 'bg-lime-400/15', strong: 'bg-lime-400/30', border: 'border-lime-400/40', edge: 'border-lime-400/80' },
+  { name: 'fuchsia', text: 'text-fuchsia-400', bg: 'bg-fuchsia-400', soft: 'bg-fuchsia-400/15', strong: 'bg-fuchsia-400/30', border: 'border-fuchsia-400/40', edge: 'border-fuchsia-400/80' }
 ]
 
 // unknown/system actors and anything not in the roster
@@ -237,7 +239,8 @@ const GRAY: ActorColor = {
   bg: 'bg-slate-400',
   soft: 'bg-slate-400/15',
   strong: 'bg-slate-400/30',
-  border: 'border-slate-400/40'
+  border: 'border-slate-400/40',
+  edge: 'border-slate-400/80'
 }
 
 // Attribution labels sit on tinted rows: neon yellow reads everywhere except

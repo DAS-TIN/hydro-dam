@@ -8,19 +8,23 @@ import Avatar from './Avatar'
  * freshly typed/pasted line has height to land in before the view re-renders.
  * live (from a collaboration session) tints uncommitted lines in the colour of
  * whoever wrote them; clicking the label or avatar unfolds what the lines said
- * before. cursors renders each participant's blinking insertion caret. */
+ * before. cursors renders each participant's blinking insertion caret.
+ * brackets (default) draws multi-line segments as a brace down their right
+ * side with the label at its middle; off puts the label on the first line. */
 export default function CodeView({
   text,
   path,
   padLines = 0,
   live,
-  cursors
+  cursors,
+  brackets = true
 }: {
   text: string
   path: string
   padLines?: number
   live?: Map<number, LiveLineMark>
   cursors?: LiveCursor[]
+  brackets?: boolean
 }) {
   const lines = useMemo(() => highlight(text, extOf(path)), [text, path])
   const raw = useMemo(() => text.split('\n'), [text])
@@ -28,10 +32,10 @@ export default function CodeView({
   // which segment's history is unfolded, keyed by its first line
   const [openHist, setOpenHist] = useState<number | null>(null)
 
-  const editLabel = (m: LiveLineMark) =>
-    m.startLine === m.endLine
-      ? `${m.name} last edited this line`
-      : `${m.name} last edited lines ${m.startLine}-${m.endLine}`
+  // "last edited ..." without the name - the name gets its own colour
+  const actionLabel = (m: LiveLineMark) =>
+    m.startLine === m.endLine ? 'last edited this line' : `last edited lines ${m.startLine}-${m.endLine}`
+  const hoverLabel = (m: LiveLineMark) => `${m.name} ${actionLabel(m)} ${timeAgo(m.at)}`
   const labelClass = (m: LiveLineMark) => liveLabelClass(m.color.name)
 
   return (
@@ -43,7 +47,7 @@ export default function CodeView({
         return (
           <React.Fragment key={i}>
             <div
-              title={mark && !mark.first ? `${editLabel(mark)} ${timeAgo(mark.at)}` : undefined}
+              title={mark ? hoverLabel(mark) : undefined}
               className={`flex hover:bg-ink-850/60 ${mark ? `live-tinted ${mark.recent ? mark.color.strong : mark.color.soft}` : ''}`}
             >
               <span
@@ -52,8 +56,8 @@ export default function CodeView({
               >
                 {mark?.first && (
                   <button
-                    title={`${editLabel(mark)} ${timeAgo(mark.at)} - click for line history`}
-                    onClick={() => setOpenHist(unfolded ? null : mark.startLine)}
+                    title={`${hoverLabel(mark)} - click for line history`}
+                    onClick={() => setOpenHist(openHist === mark.startLine ? null : mark.startLine)}
                   >
                     <Avatar name={mark.name} bg={mark.color.bg} size={13} />
                   </button>
@@ -82,19 +86,48 @@ export default function CodeView({
                     )}
               </span>
               <span className="flex-1" />
-              {mark?.first ? (
-                // IDE-style inline attribution: informational only, never part of a copy
-                <span
-                  className="cursor-pointer select-none self-center whitespace-nowrap pl-8 pr-4 text-[11px] italic"
-                  title="Click for line history"
-                  onClick={() => setOpenHist(unfolded ? null : mark.startLine)}
-                >
-                  <span className={labelClass(mark)}>{editLabel(mark)}</span>{' '}
-                  <span className="live-when">{timeAgo(mark.at)}</span>
-                </span>
-              ) : (
-                <span className="pr-6" />
-              )}
+              {(() => {
+                if (!mark) return <span className="pr-6" />
+                const span = mark.endLine - mark.startLine + 1
+                if (!brackets || span === 1) {
+                  if (!mark.first) return <span className="pr-6" />
+                  // IDE-style inline attribution: informational only, never part of a copy
+                  return (
+                    <span
+                      className="cursor-pointer select-none self-center whitespace-nowrap pl-8 pr-4 text-[11px] italic"
+                      title="Click for line history"
+                      onClick={() => setOpenHist(openHist === mark.startLine ? null : mark.startLine)}
+                    >
+                      <span className={mark.color.text}>{mark.name}</span>{' '}
+                      <span className={labelClass(mark)}>{actionLabel(mark)}</span>{' '}
+                      <span className="live-when">{timeAgo(mark.at)}</span>
+                    </span>
+                  )
+                }
+                const line = i + 1
+                const mid = mark.startLine + Math.floor((span - 1) / 2)
+                return (
+                  <span
+                    className={`relative mr-3 w-3 shrink-0 self-stretch border-r-2 ${mark.color.edge} ${
+                      line === mark.startLine ? 'rounded-tr border-t-2' : ''
+                    } ${line === mark.endLine ? 'rounded-br border-b-2' : ''}`}
+                  >
+                    {line === mid && (
+                      <span
+                        className="absolute right-1 z-10 flex -translate-y-1/2 cursor-pointer select-none items-center gap-1.5 whitespace-nowrap text-[11px] italic"
+                        style={{ top: span % 2 === 0 ? '100%' : '50%' }}
+                        title="Click for line history"
+                        onClick={() => setOpenHist(openHist === mark.startLine ? null : mark.startLine)}
+                      >
+                        <span className={mark.color.text}>{mark.name}</span>
+                        <span className={labelClass(mark)}>{actionLabel(mark)}</span>
+                        <span className="live-when">{timeAgo(mark.at)}</span>
+                        <span className={`w-2 border-t-2 ${mark.color.edge}`} />
+                      </span>
+                    )}
+                  </span>
+                )
+              })()}
             </div>
             {unfolded && (
               <div className="flex select-text">

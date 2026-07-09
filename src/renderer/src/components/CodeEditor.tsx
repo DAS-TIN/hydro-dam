@@ -16,6 +16,7 @@ export default function CodeEditor({
   path,
   live,
   cursors,
+  brackets,
   onSave
 }: {
   value: string
@@ -23,6 +24,7 @@ export default function CodeEditor({
   path: string
   live?: Map<number, LiveLineMark>
   cursors?: LiveCursor[]
+  brackets?: boolean
   onSave?: () => void
 }) {
   // Same line count and gutter formula as CodeView (it drops one trailing
@@ -37,7 +39,7 @@ export default function CodeEditor({
   return (
     <div className="relative min-w-max">
       {/* One reserved blank line so a new line has room before CodeView re-renders. */}
-      <CodeView text={value} path={path} padLines={1} live={live} cursors={cursors} />
+      <CodeView text={value} path={path} padLines={1} live={live} cursors={cursors} brackets={brackets} />
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}

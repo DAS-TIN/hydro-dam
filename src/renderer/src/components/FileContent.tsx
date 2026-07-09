@@ -19,6 +19,7 @@ export default function FileContent({
   editable,
   live,
   cursors,
+  brackets,
   refreshKey,
   toast,
   onSaved,
@@ -31,6 +32,8 @@ export default function FileContent({
   // per-line live-collab attribution and carets, rendered by CodeView
   live?: Map<number, LiveLineMark>
   cursors?: LiveCursor[]
+  // bracket-style multi-line attribution labels (see CodeView)
+  brackets?: boolean
   // bump to re-read the file from disk, e.g. when session peers edit it
   refreshKey?: unknown
   toast?: (kind: 'ok' | 'err', text: string) => void
@@ -118,7 +121,7 @@ export default function FileContent({
           // Markdown edits render live on the right, word-processor style.
           <div className="grid min-h-0 flex-1 grid-cols-2">
             <div className="min-h-0 overflow-auto border-r border-ink-800">
-              <CodeEditor value={draft} onChange={setDraft} path={path} live={live} cursors={cursors} onSave={save} />
+              <CodeEditor value={draft} onChange={setDraft} path={path} live={live} cursors={cursors} brackets={brackets} onSave={save} />
             </div>
             <div className="min-h-0 overflow-auto bg-ink-900">
               <Markdown text={draft} />
@@ -126,11 +129,11 @@ export default function FileContent({
           </div>
         ) : (
           <div className="min-h-0 flex-1 overflow-auto">
-            <CodeEditor value={draft} onChange={setDraft} path={path} live={live} cursors={cursors} onSave={save} />
+            <CodeEditor value={draft} onChange={setDraft} path={path} live={live} cursors={cursors} brackets={brackets} onSave={save} />
           </div>
         )
       ) : (
-        <CodeView text={data.text ?? ''} path={path} live={live} cursors={cursors} />
+        <CodeView text={data.text ?? ''} path={path} live={live} cursors={cursors} brackets={brackets} />
       )
 
     if (!editable) return body

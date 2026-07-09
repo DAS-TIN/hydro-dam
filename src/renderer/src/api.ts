@@ -384,6 +384,7 @@ export interface Settings {
   aiInstructions: string
   uiZoom: number
   secretScanOnPush: boolean
+  liveBrackets: boolean
 }
 
 export interface ExcludeProfile {
