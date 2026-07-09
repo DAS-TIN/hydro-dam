@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { api, FilePreview as Preview, humanSize } from '../api'
 import { isMarkdown } from '../highlight'
-import { LiveLineMark } from '../rtc'
+import { LiveCursor, LiveLineMark } from '../rtc'
 import CodeView from './CodeView'
 import CodeEditor from './CodeEditor'
 import Markdown from './Markdown'
@@ -18,6 +18,8 @@ export default function FileContent({
   view,
   editable,
   live,
+  cursors,
+  refreshKey,
   toast,
   onSaved,
   onLoaded
@@ -26,8 +28,11 @@ export default function FileContent({
   path: string
   view: 'code' | 'preview'
   editable?: boolean
-  // per-line live-collab attribution, rendered by CodeView
+  // per-line live-collab attribution and carets, rendered by CodeView
   live?: Map<number, LiveLineMark>
+  cursors?: LiveCursor[]
+  // bump to re-read the file from disk, e.g. when session peers edit it
+  refreshKey?: unknown
   toast?: (kind: 'ok' | 'err', text: string) => void
   onSaved?: () => void
   onLoaded?: (p: Preview) => void
@@ -39,23 +44,38 @@ export default function FileContent({
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    let live = true
+    let alive = true
     setData(null)
     setError('')
     setEditing(false)
     api()
       .readFile(cwd, path)
       .then((p) => {
-        if (!live) return
+        if (!alive) return
         setData(p)
         onLoaded?.(p)
       })
-      .catch((e) => live && setError(e.message))
+      .catch((e) => alive && setError(e.message))
     return () => {
-      live = false
+      alive = false
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cwd, path])
+
+  // Session peers keep editing while you look: quietly re-read on refreshKey
+  // changes, but never while you are editing yourself.
+  useEffect(() => {
+    if (refreshKey === undefined || editing) return
+    let alive = true
+    api()
+      .readFile(cwd, path)
+      .then((p) => alive && setData(p))
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshKey])
 
   const save = async () => {
     setSaving(true)
@@ -97,7 +117,7 @@ export default function FileContent({
     ) : view === 'preview' && md ? (
       <Markdown text={data.text ?? ''} />
     ) : (
-      <CodeView text={data.text ?? ''} path={path} live={live} />
+      <CodeView text={data.text ?? ''} path={path} live={live} cursors={cursors} />
     )
 
     if (!editable) return body

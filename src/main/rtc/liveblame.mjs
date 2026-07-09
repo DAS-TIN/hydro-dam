@@ -32,11 +32,23 @@ export function rangeHash(lines, startLine, endLine) {
   return sha256(lines.slice(startLine - 1, endLine).join('\n'))
 }
 
+const TEXT_CAP = 400
+const HISTORY_CAP = 5
+
+function clip(text) {
+  return text.length > TEXT_CAP ? text.slice(0, TEXT_CAP) + '...' : text
+}
+
 /**
  * Reconcile one path's segments against the ranges currently changed vs HEAD.
  * Mutates and returns the whole collection.
  *
- * @param {Array<{path:string,startLine:number,endLine:number,actorId:string,at:number,hash:string}>} segments
+ * Each segment remembers what its range said before it last changed hands
+ * (history, newest last), so the UI can show "at 14:32 it said this". Rapid
+ * follow-up edits by the same author collapse into one revision instead of
+ * recording every keystroke.
+ *
+ * @param {Array<{path:string,startLine:number,endLine:number,actorId:string,at:number,hash:string,text?:string,history?:{actorId:string,at:number,text:string}[]}>} segments
  * @param {string} path
  * @param {{startLine:number,endLine:number}[]} ranges
  * @param {string[]} lines current working-tree lines of the file
@@ -49,7 +61,26 @@ export function mergeSegments(segments, path, ranges, lines, actorId, now = Date
   const next = ranges.map((r) => {
     const hash = rangeHash(lines, r.startLine, r.endLine)
     const kept = old.find((s) => s.startLine === r.startLine && s.endLine === r.endLine && s.hash === hash)
-    return kept || { path, startLine: r.startLine, endLine: r.endLine, actorId, at: now, hash }
+    if (kept) return kept
+    // the freshest overlapping old segment is this range's predecessor
+    const prev = old
+      .filter((s) => s.startLine <= r.endLine && r.startLine <= s.endLine)
+      .sort((a, b) => b.at - a.at)[0]
+    const history = !prev
+      ? []
+      : prev.actorId === actorId && now - prev.at < 60_000
+        ? prev.history || []
+        : [...(prev.history || []), { actorId: prev.actorId, at: prev.at, text: prev.text ?? '' }].slice(-HISTORY_CAP)
+    return {
+      path,
+      startLine: r.startLine,
+      endLine: r.endLine,
+      actorId,
+      at: now,
+      hash,
+      text: clip(lines.slice(r.startLine - 1, r.endLine).join('\n')),
+      history
+    }
   })
   segments.length = 0
   segments.push(...rest, ...next)

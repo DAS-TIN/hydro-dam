@@ -11,7 +11,7 @@ export interface RtcActor {
   lastSeenAt: number
   activeTaskId: string | null
   activeFiles: string[]
-  cursor: { path: string; line: number } | null
+  cursor: { path: string; line: number; col?: number } | null
   status: string
 }
 
@@ -141,7 +141,14 @@ export interface RtcChange {
 
 // Uncommitted lines with a known author: the live half of blame. Committed
 // lines come from git blame; these cover the gap between HEAD and the
-// working tree. Line numbers are working-tree coordinates.
+// working tree. Line numbers are working-tree coordinates. History holds
+// what the range said before it last changed hands, newest last.
+export interface RtcLiveBlameRevision {
+  actorId: string
+  at: number
+  text: string
+}
+
 export interface RtcLiveBlameSeg {
   path: string
   startLine: number
@@ -149,6 +156,8 @@ export interface RtcLiveBlameSeg {
   actorId: string
   at: number
   hash: string
+  text?: string
+  history?: RtcLiveBlameRevision[]
 }
 
 export interface RtcViolation {
@@ -183,7 +192,7 @@ export interface RtcState {
   manifest: { entries: RtcManifestEntry[]; manifestHash: string; skipped?: { path: string; reason: string }[] }
   settings: RtcSettings
   local: { activeActorId: string | null; activeTaskId: string | null }
-  presence: Record<string, { activeFiles?: string[]; cursor?: { path: string; line: number }; note?: string }>
+  presence: Record<string, { activeFiles?: string[]; cursor?: { path: string; line: number; col?: number }; note?: string }>
 }
 
 export interface RtcTip {
@@ -330,13 +339,17 @@ export function presenceLabel(a: CollabMark['actors'][number]): string {
 }
 
 // Per-line live attribution for one file, keyed by working-tree line number.
-// Drives the coloured highlights in the diff, file and blame views.
+// Drives the coloured highlights in the diff, file and blame views. History
+// carries the earlier versions of the range, oldest first, names resolved.
 export interface LiveLineMark {
   name: string
   color: ActorColor
   at: number
   recent: boolean // within 5 minutes of the file's newest live edit
   first: boolean // first line of its segment - where the avatar goes
+  startLine: number
+  endLine: number
+  history: { name: string; color: ActorColor; at: number; text: string }[]
 }
 
 export function buildLiveLineMarks(state: RtcState, path: string): Map<number, LiveLineMark> {
@@ -344,19 +357,52 @@ export function buildLiveLineMarks(state: RtcState, path: string): Map<number, L
   const segs = (state.liveblame || []).filter((s) => s.path === path)
   if (!segs.length) return out
   const newest = Math.max(...segs.map((s) => s.at))
+  const nameOf = (id: string) => state.actors.find((a) => a.id === id)?.displayName || actorShort(id)
   for (const s of segs) {
-    const actor = state.actors.find((a) => a.id === s.actorId)
     const mark = {
-      name: actor?.displayName || actorShort(s.actorId),
+      name: nameOf(s.actorId),
       color: actorColor(state.actors, s.actorId),
       at: s.at,
-      recent: newest - s.at < 5 * 60_000
+      recent: newest - s.at < 5 * 60_000,
+      startLine: s.startLine,
+      endLine: s.endLine,
+      history: (s.history || []).map((h) => ({
+        name: nameOf(h.actorId),
+        color: actorColor(state.actors, h.actorId),
+        at: h.at,
+        text: h.text
+      }))
     }
     for (let ln = s.startLine; ln <= s.endLine; ln++) {
       out.set(ln, { ...mark, first: ln === s.startLine })
     }
   }
   return out
+}
+
+// Everyone's blinking insertion caret in one file, for IDE-style presence.
+export interface LiveCursor {
+  name: string
+  bg: string
+  line: number
+  col?: number
+}
+
+export function buildLiveCursors(state: RtcState, path: string): LiveCursor[] {
+  const out = new Map<string, LiveCursor>()
+  const push = (id: string, cur: { path: string; line: number; col?: number } | null | undefined) => {
+    if (!cur || cur.path.replace(/\\/g, '/') !== path) return
+    const a = state.actors.find((x) => x.id === id)
+    out.set(id, {
+      name: a?.displayName || actorShort(id),
+      bg: actorColor(state.actors, id).bg,
+      line: cur.line,
+      col: cur.col
+    })
+  }
+  for (const a of state.actors) push(a.id, a.cursor)
+  for (const [id, p] of Object.entries(state.presence)) push(id, p.cursor)
+  return [...out.values()]
 }
 
 export function buildCollabMarks(state: RtcState): Map<string, CollabMark> {

@@ -81,6 +81,37 @@ test('mergeSegments keeps untouched ranges and re-attributes changed ones', () =
   assert.deepEqual(segments.map((s) => s.path), ['other.txt'])
 })
 
+test('a re-attributed range remembers what it said before', () => {
+  const segments = []
+  mergeSegments(segments, 'app.txt', [{ startLine: 2, endLine: 2 }], ['one', 'alex wrote this'], ALEX, 1000)
+
+  // Dastin rewrites Alex's line: her version lands in the history
+  mergeSegments(segments, 'app.txt', [{ startLine: 2, endLine: 2 }], ['one', 'dastin replaced it'], DASTIN, 100_000)
+  assert.equal(segments[0].actorId, DASTIN)
+  assert.equal(segments[0].text, 'dastin replaced it')
+  assert.deepEqual(segments[0].history, [{ actorId: ALEX, at: 1000, text: 'alex wrote this' }])
+
+  // rapid follow-up edits by the same author do not spam the history
+  mergeSegments(segments, 'app.txt', [{ startLine: 2, endLine: 2 }], ['one', 'dastin typed more'], DASTIN, 110_000)
+  assert.equal(segments[0].history.length, 1)
+
+  // but a later pass by the same author records a real revision
+  mergeSegments(segments, 'app.txt', [{ startLine: 2, endLine: 2 }], ['one', 'dastin came back'], DASTIN, 500_000)
+  assert.equal(segments[0].history.length, 2)
+  assert.equal(segments[0].history[1].actorId, DASTIN)
+  assert.equal(segments[0].history[1].text, 'dastin typed more')
+})
+
+test('history is capped so long sessions stay small', () => {
+  const segments = []
+  for (let n = 0; n < 10; n++) {
+    const actor = n % 2 ? ALEX : DASTIN
+    mergeSegments(segments, 'app.txt', [{ startLine: 1, endLine: 1 }], [`version ${n}`], actor, (n + 1) * 100_000)
+  }
+  assert.equal(segments[0].history.length, 5)
+  assert.equal(segments[0].history[4].text, 'version 8')
+})
+
 test('updateLiveBlame tracks edits against HEAD and clears after commit', async () => {
   const dir = makeRepo()
   try {

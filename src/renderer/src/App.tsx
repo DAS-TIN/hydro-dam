@@ -19,7 +19,7 @@ import {
   basename,
   relTime
 } from './api'
-import { RtcState, buildCollabMarks, buildLiveLineMarks, presenceLabel } from './rtc'
+import { RtcState, buildCollabMarks, buildLiveCursors, buildLiveLineMarks, presenceLabel } from './rtc'
 import Avatar from './components/Avatar'
 import FileList from './components/FileList'
 import RepoTree from './components/RepoTree'
@@ -541,6 +541,10 @@ export default function App() {
   // file views so both colour uncommitted lines by who wrote them.
   const liveMarks = useMemo(
     () => (__COLLAB__ && rtcLive && selPath ? buildLiveLineMarks(rtcLive, selPath) : null),
+    [rtcLive, selPath]
+  )
+  const liveCursors = useMemo(
+    () => (__COLLAB__ && rtcLive && selPath ? buildLiveCursors(rtcLive, selPath) : null),
     [rtcLive, selPath]
   )
   useEffect(() => {
@@ -2186,6 +2190,8 @@ export default function App() {
                     view={viewTab === 'preview' ? 'preview' : 'code'}
                     editable
                     live={liveMarks ?? undefined}
+                    cursors={liveCursors ?? undefined}
+                    refreshKey={__COLLAB__ ? rtcLive : undefined}
                     toast={(k, t) => toast(k, t)}
                     onSaved={() => refresh()}
                   />
