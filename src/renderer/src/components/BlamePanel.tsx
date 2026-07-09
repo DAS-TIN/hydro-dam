@@ -143,7 +143,9 @@ export default function BlamePanel({
                     )}
                   </span>
                   <span className="w-12 shrink-0 select-none px-2 text-right text-slate-600">{l.lineNo}</span>
-                  <span className="whitespace-pre px-2 text-slate-300">{l.content === '' ? ' ' : l.content}</span>
+                  <span className={`whitespace-pre px-2 ${a.live ? 'text-slate-100' : 'text-slate-300'}`}>
+                    {l.content === '' ? ' ' : l.content}
+                  </span>
                 </div>
               )
             })}

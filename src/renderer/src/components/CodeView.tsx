@@ -43,7 +43,7 @@ export default function CodeView({
           <React.Fragment key={i}>
             <div
               title={mark && !mark.first ? editLabel(mark) : undefined}
-              className={`flex hover:bg-ink-850/60 ${mark ? (mark.recent ? mark.color.strong : mark.color.soft) : ''}`}
+              className={`flex hover:bg-ink-850/60 ${mark ? `live-tinted ${mark.recent ? mark.color.strong : mark.color.soft}` : ''}`}
             >
               <span
                 className="sticky left-0 flex shrink-0 select-none items-center justify-end gap-1 border-r border-ink-800 bg-ink-900 pr-2.5 text-right text-ink-600"

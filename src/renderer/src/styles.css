@@ -104,6 +104,15 @@ body {
   color: #5b6480;
   font-style: italic;
 }
+/* Lines tinted by live-collab attribution: lift the text so it stays
+   readable on the colour wash - plain code goes near-white and the muted
+   comment gray becomes neon green. */
+.live-tinted {
+  color: #eef2f8;
+}
+.live-tinted .tok-com {
+  color: #45f884;
+}
 .tok-num {
   color: #f0b464;
 }
