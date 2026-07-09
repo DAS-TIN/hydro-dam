@@ -176,7 +176,7 @@ export default function HunkStager({
                 <div
                   key={i}
                   onClick={() => changed && toggle(h, ln.selIdx)}
-                  title={mark ? `${mark.name} - edited ${timeAgo(mark.at)} - not committed yet` : undefined}
+                  title={mark ? `${mark.mine ? 'You' : mark.name} - edited ${timeAgo(mark.at)} - not committed yet` : undefined}
                   className={`diff-line flex ${bg} ${changed ? 'cursor-pointer' : ''} ${
                     selected ? 'ring-1 ring-inset ring-accent/70' : ''
                   }`}
@@ -195,7 +195,7 @@ export default function HunkStager({
                   {mark && (
                     <span className="flex shrink-0 select-none items-center gap-1.5 self-center pl-6 pr-3 text-[11px] italic">
                       <Avatar name={mark.name} bg={mark.color.bg} size={12} />
-                      <span className={mark.color.text}>{mark.name}</span>
+                      <span className={mark.color.text}>{mark.mine ? 'You' : mark.name}</span>
                       <span className="live-when">{timeAgo(mark.at)}</span>
                     </span>
                   )}

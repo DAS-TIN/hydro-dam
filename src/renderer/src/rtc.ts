@@ -352,6 +352,7 @@ export function presenceLabel(a: CollabMark['actors'][number]): string {
 // carries the earlier versions of the range, oldest first, names resolved.
 export interface LiveLineMark {
   name: string
+  mine: boolean // the local participant wrote it - label reads "You"
   color: ActorColor
   at: number
   recent: boolean // within 5 minutes of the file's newest live edit
@@ -366,10 +367,12 @@ export function buildLiveLineMarks(state: RtcState, path: string): Map<number, L
   const segs = (state.liveblame || []).filter((s) => s.path === path)
   if (!segs.length) return out
   const newest = Math.max(...segs.map((s) => s.at))
+  const me = state.local.activeActorId
   const nameOf = (id: string) => state.actors.find((a) => a.id === id)?.displayName || actorShort(id)
   for (const s of segs) {
     const mark = {
       name: nameOf(s.actorId),
+      mine: !!me && s.actorId === me,
       color: actorColor(state.actors, s.actorId),
       at: s.at,
       recent: newest - s.at < 5 * 60_000,

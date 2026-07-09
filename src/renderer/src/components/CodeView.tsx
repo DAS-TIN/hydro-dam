@@ -32,10 +32,12 @@ export default function CodeView({
   // which segment's history is unfolded, keyed by its first line
   const [openHist, setOpenHist] = useState<number | null>(null)
 
-  // "last edited ..." without the name - the name gets its own colour
+  // "You" for your own edits, otherwise the author's name - coloured either way
+  const who = (m: LiveLineMark) => (m.mine ? 'You' : m.name)
+  // "edited ..." without the name - the name gets its own colour
   const actionLabel = (m: LiveLineMark) =>
-    m.startLine === m.endLine ? 'last edited this line' : `last edited lines ${m.startLine}-${m.endLine}`
-  const hoverLabel = (m: LiveLineMark) => `${m.name} ${actionLabel(m)} ${timeAgo(m.at)}`
+    m.startLine === m.endLine ? 'edited this line' : `edited lines ${m.startLine}-${m.endLine}`
+  const hoverLabel = (m: LiveLineMark) => `${who(m)} ${actionLabel(m)} ${timeAgo(m.at)}`
   const labelClass = (m: LiveLineMark) => liveLabelClass(m.color.name)
 
   return (
@@ -89,6 +91,13 @@ export default function CodeView({
               {(() => {
                 if (!mark) return <span className="pr-6" />
                 const span = mark.endLine - mark.startLine + 1
+                const labelText = (
+                  <>
+                    <span className={mark.color.text}>{who(mark)}</span>{' '}
+                    <span className={labelClass(mark)}>{actionLabel(mark)}</span>{' '}
+                    <span className="live-when">{timeAgo(mark.at)}</span>
+                  </>
+                )
                 if (!brackets || span === 1) {
                   if (!mark.first) return <span className="pr-6" />
                   // IDE-style inline attribution: informational only, never part of a copy
@@ -98,34 +107,41 @@ export default function CodeView({
                       title="Click for line history"
                       onClick={() => setOpenHist(openHist === mark.startLine ? null : mark.startLine)}
                     >
-                      <span className={mark.color.text}>{mark.name}</span>{' '}
-                      <span className={labelClass(mark)}>{actionLabel(mark)}</span>{' '}
-                      <span className="live-when">{timeAgo(mark.at)}</span>
+                      {labelText}
                     </span>
                   )
                 }
                 const line = i + 1
                 const mid = mark.startLine + Math.floor((span - 1) / 2)
                 return (
-                  <span
-                    className={`relative mr-3 w-3 shrink-0 self-stretch border-r-2 ${mark.color.edge} ${
-                      line === mark.startLine ? 'rounded-tr border-t-2' : ''
-                    } ${line === mark.endLine ? 'rounded-br border-b-2' : ''}`}
-                  >
-                    {line === mid && (
-                      <span
-                        className="absolute right-1 z-10 flex -translate-y-1/2 cursor-pointer select-none items-center gap-1.5 whitespace-nowrap text-[11px] italic"
-                        style={{ top: span % 2 === 0 ? '100%' : '50%' }}
-                        title="Click for line history"
-                        onClick={() => setOpenHist(openHist === mark.startLine ? null : mark.startLine)}
-                      >
-                        <span className={mark.color.text}>{mark.name}</span>
-                        <span className={labelClass(mark)}>{actionLabel(mark)}</span>
-                        <span className="live-when">{timeAgo(mark.at)}</span>
-                        <span className={`w-2 border-t-2 ${mark.color.edge}`} />
-                      </span>
-                    )}
-                  </span>
+                  <>
+                    <span
+                      className={`relative ml-3 w-3 shrink-0 self-stretch border-l-2 ${mark.color.edge} ${
+                        line === mark.startLine ? 'rounded-tl border-t-2' : ''
+                      } ${line === mark.endLine ? 'rounded-bl border-b-2' : ''}`}
+                    >
+                      {line === mid && (
+                        <>
+                          {/* connector hyphen from the spine out toward the label */}
+                          <span
+                            className={`absolute left-0 w-3 border-t-2 ${mark.color.edge}`}
+                            style={{ top: span % 2 === 0 ? '100%' : '50%' }}
+                          />
+                          <span
+                            className="absolute left-full z-10 flex -translate-y-1/2 cursor-pointer select-none items-center gap-1.5 whitespace-nowrap pl-2 text-[11px] italic"
+                            style={{ top: span % 2 === 0 ? '100%' : '50%' }}
+                            title="Click for line history"
+                            onClick={() => setOpenHist(openHist === mark.startLine ? null : mark.startLine)}
+                          >
+                            {labelText}
+                          </span>
+                        </>
+                      )}
+                    </span>
+                    {/* reserve room so the absolute label is never clipped and
+                        every segment row keeps the spine at the same column */}
+                    <span className="w-64 shrink-0" aria-hidden />
+                  </>
                 )
               })()}
             </div>
@@ -138,7 +154,7 @@ export default function CodeView({
                 <div className={`my-1 ml-3 flex-1 rounded border-l-2 bg-ink-850/80 px-3 py-2 ${mark!.color.border}`}>
                   <div className="mb-1.5 flex items-center gap-1.5 text-[11px]">
                     <Avatar name={mark!.name} bg={mark!.color.bg} size={14} />
-                    <span className={mark!.color.text}>{mark!.name}</span>
+                    <span className={mark!.color.text}>{who(mark!)}</span>
                     <span className="text-slate-500">now - {timeAgo(mark!.at)}</span>
                   </div>
                   <pre className="mb-2 whitespace-pre-wrap break-all text-[11px] text-slate-300">
