@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { api, FilePreview as Preview, humanSize } from '../api'
 import { isMarkdown } from '../highlight'
+import { LiveLineMark } from '../rtc'
 import CodeView from './CodeView'
 import CodeEditor from './CodeEditor'
 import Markdown from './Markdown'
@@ -16,6 +17,7 @@ export default function FileContent({
   path,
   view,
   editable,
+  live,
   toast,
   onSaved,
   onLoaded
@@ -24,6 +26,8 @@ export default function FileContent({
   path: string
   view: 'code' | 'preview'
   editable?: boolean
+  // per-line live-collab attribution, rendered by CodeView
+  live?: Map<number, LiveLineMark>
   toast?: (kind: 'ok' | 'err', text: string) => void
   onSaved?: () => void
   onLoaded?: (p: Preview) => void
@@ -93,7 +97,7 @@ export default function FileContent({
     ) : view === 'preview' && md ? (
       <Markdown text={data.text ?? ''} />
     ) : (
-      <CodeView text={data.text ?? ''} path={path} />
+      <CodeView text={data.text ?? ''} path={path} live={live} />
     )
 
     if (!editable) return body

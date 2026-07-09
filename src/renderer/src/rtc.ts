@@ -329,6 +329,36 @@ export function presenceLabel(a: CollabMark['actors'][number]): string {
   return bits.join(', ')
 }
 
+// Per-line live attribution for one file, keyed by working-tree line number.
+// Drives the coloured highlights in the diff, file and blame views.
+export interface LiveLineMark {
+  name: string
+  color: ActorColor
+  at: number
+  recent: boolean // within 5 minutes of the file's newest live edit
+  first: boolean // first line of its segment - where the avatar goes
+}
+
+export function buildLiveLineMarks(state: RtcState, path: string): Map<number, LiveLineMark> {
+  const out = new Map<number, LiveLineMark>()
+  const segs = (state.liveblame || []).filter((s) => s.path === path)
+  if (!segs.length) return out
+  const newest = Math.max(...segs.map((s) => s.at))
+  for (const s of segs) {
+    const actor = state.actors.find((a) => a.id === s.actorId)
+    const mark = {
+      name: actor?.displayName || actorShort(s.actorId),
+      color: actorColor(state.actors, s.actorId),
+      at: s.at,
+      recent: newest - s.at < 5 * 60_000
+    }
+    for (let ln = s.startLine; ln <= s.endLine; ln++) {
+      out.set(ln, { ...mark, first: ln === s.startLine })
+    }
+  }
+  return out
+}
+
 export function buildCollabMarks(state: RtcState): Map<string, CollabMark> {
   const marks = new Map<string, CollabMark>()
   const mark = (p: string) => {

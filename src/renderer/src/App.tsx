@@ -19,7 +19,7 @@ import {
   basename,
   relTime
 } from './api'
-import { RtcState, buildCollabMarks, presenceLabel } from './rtc'
+import { RtcState, buildCollabMarks, buildLiveLineMarks, presenceLabel } from './rtc'
 import Avatar from './components/Avatar'
 import FileList from './components/FileList'
 import RepoTree from './components/RepoTree'
@@ -536,6 +536,13 @@ export default function App() {
   // Selecting a file in the changes list tells the session you are on it,
   // the way an IDE shares your open editor.
   const selPath = sel?.file?.path ?? null
+
+  // Line-level attribution for the selected file, shared by the diff and
+  // file views so both colour uncommitted lines by who wrote them.
+  const liveMarks = useMemo(
+    () => (__COLLAB__ && rtcLive && selPath ? buildLiveLineMarks(rtcLive, selPath) : null),
+    [rtcLive, selPath]
+  )
   useEffect(() => {
     if (!__COLLAB__ || !cwd || !selPath) return
     const me = rtcLive?.local.activeActorId
@@ -2178,6 +2185,7 @@ export default function App() {
                     path={sel.file.path}
                     view={viewTab === 'preview' ? 'preview' : 'code'}
                     editable
+                    live={liveMarks ?? undefined}
                     toast={(k, t) => toast(k, t)}
                     onSaved={() => refresh()}
                   />
@@ -2194,6 +2202,7 @@ export default function App() {
                     path={sel.file.path}
                     staged={sel.staged}
                     text={diff}
+                    live={liveMarks ?? undefined}
                     toast={(k, t) => toast(k, t)}
                     onChanged={() => refresh()}
                   />
