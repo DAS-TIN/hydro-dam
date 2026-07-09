@@ -10,28 +10,30 @@ const ROW_PX = 12.5 * 1.55
  * the point sticks out RIGHT toward the label. Drawn once for the whole segment
  * so the curls stay tight (fixed size) while the straight body stretches to any
  * height. Colour comes from currentColor. */
+const BRACE_W = 18
 function SegmentBrace({ heightPx }: { heightPx: number }) {
-  const W = 12
   const tipX = 2
-  const bodyX = 6
-  const pointX = 12
+  const bodyX = 9
+  const pointX = 18
   const h = heightPx
   const mid = h / 2
-  const curl = Math.min(7, h / 2 - 1)
+  const curl = Math.min(13, h / 2 - 1)
+  // cubic curls (deeper than quadratics) so the brace reads as clearly curly
   const d =
-    `M ${tipX} 0 Q ${bodyX} 0 ${bodyX} ${curl} L ${bodyX} ${mid - curl} ` +
-    `Q ${bodyX} ${mid} ${pointX} ${mid} Q ${bodyX} ${mid} ${bodyX} ${mid + curl} ` +
-    `L ${bodyX} ${h - curl} Q ${bodyX} ${h} ${tipX} ${h}`
+    `M ${tipX} 0 C ${bodyX} 0 ${bodyX} 0 ${bodyX} ${curl} L ${bodyX} ${mid - curl} ` +
+    `C ${bodyX} ${mid} ${bodyX} ${mid} ${pointX} ${mid} ` +
+    `C ${bodyX} ${mid} ${bodyX} ${mid} ${bodyX} ${mid + curl} ` +
+    `L ${bodyX} ${h - curl} C ${bodyX} ${h} ${bodyX} ${h} ${tipX} ${h}`
   return (
     <svg
-      width={W}
+      width={BRACE_W}
       height={h}
-      viewBox={`0 0 ${W} ${h}`}
+      viewBox={`0 0 ${BRACE_W} ${h}`}
       fill="none"
       className="pointer-events-none"
       style={{ overflow: 'visible' }}
     >
-      <path d={d} stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" />
+      <path d={d} stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }
@@ -83,10 +85,18 @@ export default function CodeView({
           <React.Fragment key={i}>
             <div
               title={mark ? hoverLabel(mark) : undefined}
-              className={`relative flex hover:bg-ink-850/60 ${mark ? `live-tinted ${mark.recent ? mark.color.strong : mark.color.soft}` : ''}`}
+              className={`group relative flex ${
+                mark
+                  ? // keep the actor colour on hover, just lift it with a faint
+                    // overlay (a filter here would disturb the sticky gutter)
+                    `live-tinted hover:shadow-[inset_0_0_0_9999px_rgba(255,255,255,0.07)] ${
+                      mark.recent ? mark.color.strong : mark.color.soft
+                    }`
+                  : 'hover:bg-ink-850/60'
+              }`}
             >
               <span
-                className="sticky left-0 flex shrink-0 select-none items-center justify-end gap-1 border-r border-ink-800 bg-ink-900 pr-2.5 text-right text-slate-300"
+                className="sticky left-0 flex shrink-0 select-none items-center justify-end gap-1 border-r border-ink-800 bg-ink-900 pr-2.5 text-right text-slate-500 group-hover:bg-ink-800 group-hover:font-semibold group-hover:text-white"
                 style={{ minWidth: `${gutterCh}ch` }}
               >
                 {mark?.first && (
@@ -120,47 +130,62 @@ export default function CodeView({
                       )
                     )}
               </span>
-              <span className="flex-1" />
               {(() => {
-                if (!mark) return <span className="pr-6" />
-                const span = mark.endLine - mark.startLine + 1
+                if (!mark) return <span className="flex-1 pr-6" />
+                // Clamp to what is actually rendered: while a peer types, the
+                // segment metadata can briefly run ahead of the file re-read, so
+                // an unclamped brace would overshoot into empty rows below.
+                const endLine = Math.min(mark.endLine, lines.length)
+                const span = endLine - mark.startLine + 1
+                const rangeLabel =
+                  span <= 1 ? 'edited this line' : `edited lines ${mark.startLine}-${endLine}`
                 const labelText = (
                   <>
                     <span className={mark.color.text}>{who(mark)}</span>{' '}
-                    <span className={labelClass(mark)}>{actionLabel(mark)}</span>{' '}
+                    <span className={labelClass(mark)}>{rangeLabel}</span>{' '}
                     <span className="live-when">{timeAgo(mark.at)}</span>
                   </>
                 )
-                if (!brackets || span === 1) {
-                  if (!mark.first) return <span className="pr-6" />
+                if (!brackets || span <= 1) {
+                  if (!mark.first) return <span className="flex-1 pr-6" />
                   // IDE-style inline attribution: informational only, never part of a copy
                   return (
-                    <span
-                      className="cursor-pointer select-none self-center whitespace-nowrap pl-8 pr-4 text-[11px] italic"
-                      title="Click for line history"
-                      onClick={() => setOpenHist(openHist === mark.startLine ? null : mark.startLine)}
-                    >
-                      {labelText}
-                    </span>
+                    <>
+                      <span className="flex-1" />
+                      <span
+                        className="cursor-pointer select-none self-center whitespace-nowrap pl-8 pr-4 text-[11px] italic"
+                        title="Click for line history"
+                        onClick={() => setOpenHist(openHist === mark.startLine ? null : mark.startLine)}
+                      >
+                        {labelText}
+                      </span>
+                    </>
                   )
                 }
                 const mid = mark.startLine + Math.floor((span - 1) / 2)
-                if (i + 1 !== mid) return <span className="pr-6" />
+                if (i + 1 !== mid) return <span className="flex-1 pr-6" />
                 let maxLen = 0
-                for (let ln = mark.startLine; ln <= mark.endLine; ln++) {
+                for (let ln = mark.startLine; ln <= endLine; ln++) {
                   maxLen = Math.max(maxLen, (raw[ln - 1] ?? '').length)
                 }
-                const braceLeft = `calc(${gutterCh}ch + 0.75rem + ${maxLen + 1}ch)`
+                const pad = Math.max(1, maxLen - (raw[mid - 1] ?? '').length + 2)
                 return (
                   <span
-                    className={`absolute z-10 flex -translate-y-1/2 items-center ${mark.color.text}`}
-                    style={{ left: braceLeft, top: span % 2 === 0 ? '100%' : '50%' }}
+                    className={`flex shrink-0 items-center ${mark.color.text}`}
+                    style={{ marginLeft: `${pad}ch` }}
                   >
-                    <SegmentBrace heightPx={span * ROW_PX} />
+                    <span className="relative self-stretch" style={{ width: BRACE_W }}>
+                      <span
+                        className="absolute left-0 -translate-y-1/2"
+                        style={{ top: span % 2 === 0 ? '100%' : '50%' }}
+                      >
+                        <SegmentBrace heightPx={span * ROW_PX} />
+                      </span>
+                    </span>
                     {/* connector hyphen from the brace point out to the label */}
                     <span className={`h-0.5 w-6 ${mark.color.bg}`} />
                     <span
-                      className="cursor-pointer select-none whitespace-nowrap pl-2 text-[11px] italic"
+                      className="cursor-pointer select-none whitespace-nowrap pl-2 pr-6 text-[11px] italic"
                       title="Click for line history"
                       onClick={() => setOpenHist(openHist === mark.startLine ? null : mark.startLine)}
                     >
