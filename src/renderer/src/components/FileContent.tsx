@@ -53,6 +53,11 @@ export default function FileContent({
       .then((p) => {
         if (!alive) return
         setData(p)
+        // IDE-style: text files open ready to type, no Edit click first
+        if (editable && p.kind === 'text') {
+          setDraft(p.text ?? '')
+          setEditing(true)
+        }
         onLoaded?.(p)
       })
       .catch((e) => alive && setError(e.message))
@@ -63,13 +68,19 @@ export default function FileContent({
   }, [cwd, path])
 
   // Session peers keep editing while you look: quietly re-read on refreshKey
-  // changes, but never while you are editing yourself.
+  // changes. While your draft is untouched it follows the disk; the moment
+  // you type, hands off until you save.
   useEffect(() => {
-    if (refreshKey === undefined || editing) return
+    if (refreshKey === undefined) return
+    if (editing && draft !== (data?.text ?? '')) return
     let alive = true
     api()
       .readFile(cwd, path)
-      .then((p) => alive && setData(p))
+      .then((p) => {
+        if (!alive) return
+        setData(p)
+        if (editing && p.kind === 'text') setDraft(p.text ?? '')
+      })
       .catch(() => {})
     return () => {
       alive = false
@@ -83,7 +94,7 @@ export default function FileContent({
       await api().writeFile(cwd, path, draft)
       const fresh = await api().readFile(cwd, path)
       setData(fresh)
-      setEditing(false)
+      setDraft(fresh.text ?? draft) // stay in edit mode on the saved text
       toast?.('ok', `Saved ${path}.`)
       onSaved?.()
     } catch (e: any) {
@@ -98,27 +109,29 @@ export default function FileContent({
 
   if (data.kind === 'text') {
     const md = isMarkdown(path)
-    const body = editing ? (
-      md ? (
-        // Markdown edits render live on the right, word-processor style.
-        <div className="grid min-h-0 flex-1 grid-cols-2">
-          <div className="min-h-0 overflow-auto border-r border-ink-800">
-            <CodeEditor value={draft} onChange={setDraft} path={path} onSave={save} />
+    const dirty = editing && draft !== (data.text ?? '')
+    const body =
+      view === 'preview' && md ? (
+        <Markdown text={editing ? draft : (data.text ?? '')} />
+      ) : editing ? (
+        md ? (
+          // Markdown edits render live on the right, word-processor style.
+          <div className="grid min-h-0 flex-1 grid-cols-2">
+            <div className="min-h-0 overflow-auto border-r border-ink-800">
+              <CodeEditor value={draft} onChange={setDraft} path={path} live={live} cursors={cursors} onSave={save} />
+            </div>
+            <div className="min-h-0 overflow-auto bg-ink-900">
+              <Markdown text={draft} />
+            </div>
           </div>
-          <div className="min-h-0 overflow-auto bg-ink-900">
-            <Markdown text={draft} />
+        ) : (
+          <div className="min-h-0 flex-1 overflow-auto">
+            <CodeEditor value={draft} onChange={setDraft} path={path} live={live} cursors={cursors} onSave={save} />
           </div>
-        </div>
+        )
       ) : (
-        <div className="min-h-0 flex-1 overflow-auto">
-          <CodeEditor value={draft} onChange={setDraft} path={path} onSave={save} />
-        </div>
+        <CodeView text={data.text ?? ''} path={path} live={live} cursors={cursors} />
       )
-    ) : view === 'preview' && md ? (
-      <Markdown text={data.text ?? ''} />
-    ) : (
-      <CodeView text={data.text ?? ''} path={path} live={live} cursors={cursors} />
-    )
 
     if (!editable) return body
 
@@ -127,12 +140,19 @@ export default function FileContent({
         <div className="sticky top-0 z-10 flex items-center gap-1.5 border-b border-ink-800 bg-ink-900/95 px-3 py-1 backdrop-blur">
           {editing ? (
             <>
-              <span className="text-[11px] text-warn">editing</span>
+              <span className={`text-[11px] ${dirty ? 'text-warn' : 'text-slate-500'}`}>
+                {dirty ? 'unsaved changes' : 'editing - type away, Ctrl+S saves'}
+              </span>
               <span className="flex-1" />
-              <button className="btn-ghost text-xs" disabled={saving} onClick={() => setEditing(false)}>
-                Cancel
+              <button
+                className="btn-ghost text-xs"
+                disabled={saving}
+                onClick={() => setEditing(false)}
+                title="Read-only view - attribution labels and line history become clickable"
+              >
+                View
               </button>
-              <button className="btn-accent text-xs" disabled={saving} onClick={save} title="Ctrl+S">
+              <button className="btn-accent text-xs" disabled={saving || !dirty} onClick={save} title="Ctrl+S">
                 Save
               </button>
             </>
