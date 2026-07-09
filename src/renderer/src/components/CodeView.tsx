@@ -3,6 +3,39 @@ import { highlight, extOf } from '../highlight'
 import { LiveCursor, LiveLineMark, liveLabelClass, timeAgo } from '../rtc'
 import Avatar from './Avatar'
 
+// One row's rendered height: text-[12.5px] leading-[1.55].
+const ROW_PX = 12.5 * 1.55
+
+/** A curly brace "}" for a live-edit segment: tips curl LEFT toward the code,
+ * the point sticks out RIGHT toward the label. Drawn once for the whole segment
+ * so the curls stay tight (fixed size) while the straight body stretches to any
+ * height. Colour comes from currentColor. */
+function SegmentBrace({ heightPx }: { heightPx: number }) {
+  const W = 12
+  const tipX = 2
+  const bodyX = 6
+  const pointX = 12
+  const h = heightPx
+  const mid = h / 2
+  const curl = Math.min(7, h / 2 - 1)
+  const d =
+    `M ${tipX} 0 Q ${bodyX} 0 ${bodyX} ${curl} L ${bodyX} ${mid - curl} ` +
+    `Q ${bodyX} ${mid} ${pointX} ${mid} Q ${bodyX} ${mid} ${bodyX} ${mid + curl} ` +
+    `L ${bodyX} ${h - curl} Q ${bodyX} ${h} ${tipX} ${h}`
+  return (
+    <svg
+      width={W}
+      height={h}
+      viewBox={`0 0 ${W} ${h}`}
+      fill="none"
+      className="pointer-events-none"
+      style={{ overflow: 'visible' }}
+    >
+      <path d={d} stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 /** Read-only code view: line-number gutter plus syntax highlighting.
  * padLines reserves that many blank rows at the bottom - the editor uses it so a
  * freshly typed/pasted line has height to land in before the view re-renders.
@@ -50,7 +83,7 @@ export default function CodeView({
           <React.Fragment key={i}>
             <div
               title={mark ? hoverLabel(mark) : undefined}
-              className={`flex hover:bg-ink-850/60 ${mark ? `live-tinted ${mark.recent ? mark.color.strong : mark.color.soft}` : ''}`}
+              className={`relative flex hover:bg-ink-850/60 ${mark ? `live-tinted ${mark.recent ? mark.color.strong : mark.color.soft}` : ''}`}
             >
               <span
                 className="sticky left-0 flex shrink-0 select-none items-center justify-end gap-1 border-r border-ink-800 bg-ink-900 pr-2.5 text-right text-slate-300"
@@ -111,37 +144,29 @@ export default function CodeView({
                     </span>
                   )
                 }
-                const line = i + 1
                 const mid = mark.startLine + Math.floor((span - 1) / 2)
+                if (i + 1 !== mid) return <span className="pr-6" />
+                let maxLen = 0
+                for (let ln = mark.startLine; ln <= mark.endLine; ln++) {
+                  maxLen = Math.max(maxLen, (raw[ln - 1] ?? '').length)
+                }
+                const braceLeft = `calc(${gutterCh}ch + 0.75rem + ${maxLen + 1}ch)`
                 return (
-                  <>
+                  <span
+                    className={`absolute z-10 flex -translate-y-1/2 items-center ${mark.color.text}`}
+                    style={{ left: braceLeft, top: span % 2 === 0 ? '100%' : '50%' }}
+                  >
+                    <SegmentBrace heightPx={span * ROW_PX} />
+                    {/* connector hyphen from the brace point out to the label */}
+                    <span className={`h-0.5 w-6 ${mark.color.bg}`} />
                     <span
-                      className={`relative ml-3 w-3 shrink-0 self-stretch border-l-2 ${mark.color.edge} ${
-                        line === mark.startLine ? 'rounded-tl border-t-2' : ''
-                      } ${line === mark.endLine ? 'rounded-bl border-b-2' : ''}`}
+                      className="cursor-pointer select-none whitespace-nowrap pl-2 text-[11px] italic"
+                      title="Click for line history"
+                      onClick={() => setOpenHist(openHist === mark.startLine ? null : mark.startLine)}
                     >
-                      {line === mid && (
-                        <>
-                          {/* connector hyphen from the spine out toward the label */}
-                          <span
-                            className={`absolute left-0 w-3 border-t-2 ${mark.color.edge}`}
-                            style={{ top: span % 2 === 0 ? '100%' : '50%' }}
-                          />
-                          <span
-                            className="absolute left-full z-10 flex -translate-y-1/2 cursor-pointer select-none items-center gap-1.5 whitespace-nowrap pl-2 text-[11px] italic"
-                            style={{ top: span % 2 === 0 ? '100%' : '50%' }}
-                            title="Click for line history"
-                            onClick={() => setOpenHist(openHist === mark.startLine ? null : mark.startLine)}
-                          >
-                            {labelText}
-                          </span>
-                        </>
-                      )}
+                      {labelText}
                     </span>
-                    {/* reserve room so the absolute label is never clipped and
-                        every segment row keeps the spine at the same column */}
-                    <span className="w-64 shrink-0" aria-hidden />
-                  </>
+                  </span>
                 )
               })()}
             </div>
