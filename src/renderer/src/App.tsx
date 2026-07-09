@@ -590,6 +590,25 @@ export default function App() {
     }
   }
 
+  // Revert (not undo): keep history and add a new commit that backs out the
+  // last one. Safe to reach for after a push, where an undo/reset would not be.
+  async function doRevertLast() {
+    if (!cwd) return
+    const head = (await api().log(cwd).catch(() => []))[0]
+    if (!head) {
+      toast('info', 'No commit to revert yet.')
+      return
+    }
+    const ok = await confirmDialog({
+      title: 'Revert last commit',
+      message: `Revert ${head.shortHash} "${head.subject}"?`,
+      detail: 'Adds a new commit that undoes it. Nothing is rewritten, so this is safe on already-pushed history.',
+      confirmLabel: 'Revert',
+      cancelLabel: 'Cancel'
+    })
+    if (ok) run(() => A.revertCommit(cwd, 'HEAD').then(() => refresh()), 'Last commit reverted.')
+  }
+
   // Shared by the file-list hover button and the Ctrl+D shortcut.
   async function discardFile(f: FileEntry) {
     if (!cwd) return
@@ -1637,6 +1656,16 @@ export default function App() {
         >
           Pull{status && status.behind > 0 ? <span className="inline-flex items-center gap-0.5 ml-1"><IconArrowDown className="w-3 h-3" />{status.behind}</span> : ''}
         </button>
+        {status && !status.detached && (
+          <button
+            className="btn-ghost"
+            disabled={busy}
+            onClick={() => doRevertLast()}
+            title="Add a commit that undoes the last one (git revert HEAD) - safe after a push"
+          >
+            Revert
+          </button>
+        )}
         {status && status.ahead > 0 && (
           <button
             className="btn-ghost"
