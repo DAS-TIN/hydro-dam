@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, confirmDialog, GraphCommit, CommitMeta, Coauthor } from '../api'
 import { IconClose, IconArrowUp } from './Icons'
+import DiffView from './DiffView'
+import Avatar from './Avatar'
 
 type Toast = (kind: 'ok' | 'err' | 'info', text: string) => void
 
@@ -47,6 +49,27 @@ export default function PushPreview({
   const [coName, setCoName] = useState('')
   const [coEmail, setCoEmail] = useState('')
   const [busy, setBusy] = useState(false)
+  // per-file diffs of the selected commit, loaded on expand ('' = loading)
+  const [openPath, setOpenPath] = useState<string | null>(null)
+  const [diffs, setDiffs] = useState<Record<string, string>>({})
+
+  const loadDiff = (hash: string, path: string) => {
+    const key = `${hash}:${path}`
+    setDiffs((d) => (key in d ? d : { ...d, [key]: '' }))
+    api()
+      .commitFileDiff(cwd, hash, path)
+      .then((t) => setDiffs((d) => ({ ...d, [key]: t })))
+      .catch((e) => setDiffs((d) => ({ ...d, [key]: e?.message || String(e) })))
+  }
+
+  const toggleDiff = (hash: string, path: string) => {
+    if (openPath === path) {
+      setOpenPath(null)
+      return
+    }
+    setOpenPath(path)
+    loadDiff(hash, path)
+  }
 
   async function loadList(keep?: string) {
     const list = await api().unpushedCommits(cwd).catch(() => [])
@@ -73,6 +96,10 @@ export default function PushPreview({
         setMeta(m)
         setMsg(stripTrailers(m.message))
         setCos(commit ? commit.coauthors : [])
+        // show the changed lines straight away, not just the counts
+        const first = m.files[0]?.path ?? null
+        setOpenPath(first)
+        if (first) loadDiff(sel, first)
       })
       .catch((e) => toast('err', e?.message || String(e)))
   }, [sel, commits])
@@ -141,7 +168,7 @@ export default function PushPreview({
 
   return (
     <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="card flex max-h-[86vh] w-[760px] flex-col overflow-hidden shadow-2xl">
+      <div className="card flex max-h-[86vh] w-[920px] flex-col overflow-hidden shadow-2xl">
         <div className="flex items-center justify-between border-b border-ink-700/60 px-5 py-4">
           <div>
             <h2 className="text-base font-semibold text-white">Commits to push</h2>
@@ -187,6 +214,18 @@ export default function PushPreview({
               </div>
             ) : (
               <div className="space-y-4">
+                {/* who authored this commit - the committed half of blame */}
+                <div className="flex flex-wrap items-center gap-2 text-[12px]">
+                  <Avatar name={selCommit.author} bg="bg-sky-400" size={18} />
+                  <span className="font-medium text-slate-200">{selCommit.author}</span>
+                  <span className="live-when">{selCommit.relDate}</span>
+                  {selCommit.coauthors.map((c) => (
+                    <span key={coKey(c)} className="flex items-center gap-1 text-slate-400" title={`Co-authored-by: ${c.name} <${c.email}>`}>
+                      <Avatar name={c.name} bg="bg-violet-400" size={15} />
+                      {c.name}
+                    </span>
+                  ))}
+                </div>
                 <div>
                   <div className="mb-1 flex items-center justify-between">
                     <span className="text-xs font-semibold text-slate-400">Message</span>
@@ -275,17 +314,33 @@ export default function PushPreview({
                       <div className="px-3 py-2 text-[11px] text-slate-600">No file changes.</div>
                     )}
                     {meta?.files.map((f) => (
-                      <div
-                        key={f.path}
-                        className="flex items-center gap-3 border-b border-ink-800 px-3 py-1.5 text-[12px] last:border-0"
-                      >
-                        <span className="min-w-0 flex-1 truncate font-mono text-slate-300">{f.path}</span>
-                        {f.add < 0 ? (
-                          <span className="text-slate-500">binary</span>
-                        ) : (
-                          <span className="shrink-0 font-mono">
-                            <span className="text-good">+{f.add}</span> <span className="text-bad">-{f.del}</span>
-                          </span>
+                      <div key={f.path} className="border-b border-ink-800 last:border-0">
+                        <button
+                          onClick={() => toggleDiff(selCommit.hash, f.path)}
+                          title={openPath === f.path ? 'Hide the changed lines' : 'Show the changed lines'}
+                          className="flex w-full items-center gap-3 px-3 py-1.5 text-left text-[12px] hover:bg-ink-850"
+                        >
+                          <span className="w-3 text-[10px] text-slate-600">{openPath === f.path ? 'v' : '>'}</span>
+                          <span className="min-w-0 flex-1 truncate font-mono text-slate-300">{f.path}</span>
+                          {f.add < 0 ? (
+                            <span className="text-slate-500">binary</span>
+                          ) : (
+                            <span className="shrink-0 font-mono">
+                              <span className="text-good">+{f.add}</span> <span className="text-bad">-{f.del}</span>
+                            </span>
+                          )}
+                        </button>
+                        {openPath === f.path && (
+                          <div className="max-h-72 overflow-auto border-t border-ink-850 bg-ink-950">
+                            {diffs[`${selCommit.hash}:${f.path}`] === '' ? (
+                              <div className="px-3 py-2 text-xs text-slate-500">Loading diff...</div>
+                            ) : (
+                              <DiffView
+                                text={diffs[`${selCommit.hash}:${f.path}`] ?? ''}
+                                empty="Binary file or no textual diff."
+                              />
+                            )}
+                          </div>
                         )}
                       </div>
                     ))}
