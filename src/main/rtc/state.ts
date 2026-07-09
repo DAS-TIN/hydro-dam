@@ -8,7 +8,7 @@ import * as Context from './context.mjs'
 
 const COLLECTIONS = [
   'session', 'actors', 'tasks', 'locks', 'patches', 'checkpoints',
-  'suggestions', 'changes', 'violations', 'contracts', 'manifest', 'settings', 'local'
+  'suggestions', 'changes', 'liveblame', 'violations', 'contracts', 'manifest', 'settings', 'local'
 ] as const
 
 export function broadcast(payload: any): void {

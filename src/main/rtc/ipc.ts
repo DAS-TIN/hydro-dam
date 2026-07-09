@@ -13,6 +13,7 @@ import * as Actors from './actors.mjs'
 import * as Tasks from './tasks.mjs'
 import * as Locks from './locks.mjs'
 import * as Patches from './patches.mjs'
+import * as LiveBlame from './liveblame.mjs'
 import * as Checkpoints from './checkpoints.mjs'
 import * as Advisor from './advisor.mjs'
 import * as Commits from './commits.mjs'
@@ -61,6 +62,13 @@ function startWatching(cwd: string) {
       for (const b of batch) if (b.kind === 'create') active?.watcher.markKnown(b.path)
       Store.saveColl(cwd, 'changes', s.changes)
       Store.saveColl(cwd, 'violations', s.violations)
+      // per-line attribution for the blame overlay; async because it shells to git
+      LiveBlame.updateLiveBlame(cwd, s.liveblame, batch, actorId)
+        .then(() => {
+          Store.saveColl(cwd, 'liveblame', s.liveblame)
+          broadcast({ kind: 'liveblame', cwd, files: batch.map((b) => b.path) })
+        })
+        .catch(() => {})
       broadcast({ kind: 'changes', cwd, files: batch.map((b) => b.path) })
       if (violations.length) broadcast({ kind: 'violation', cwd, violations })
     },

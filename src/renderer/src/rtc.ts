@@ -139,6 +139,18 @@ export interface RtcChange {
   at: number
 }
 
+// Uncommitted lines with a known author: the live half of blame. Committed
+// lines come from git blame; these cover the gap between HEAD and the
+// working tree. Line numbers are working-tree coordinates.
+export interface RtcLiveBlameSeg {
+  path: string
+  startLine: number
+  endLine: number
+  actorId: string
+  at: number
+  hash: string
+}
+
 export interface RtcViolation {
   id: string
   path: string
@@ -166,6 +178,7 @@ export interface RtcState {
   checkpoints: RtcCheckpoint[]
   suggestions: RtcSuggestion[]
   changes: RtcChange[]
+  liveblame: RtcLiveBlameSeg[]
   violations: RtcViolation[]
   manifest: { entries: RtcManifestEntry[]; manifestHash: string; skipped?: { path: string; reason: string }[] }
   settings: RtcSettings
@@ -190,19 +203,22 @@ export interface ActorColor {
   text: string
   bg: string
   soft: string
+  strong: string
   border: string
 }
 
 // One stable colour per actor so "who did what" reads at a glance everywhere.
+// soft/strong are the two highlight shades: strong for edits from the last
+// few minutes, soft for older uncommitted ones.
 export const ACTOR_COLORS: ActorColor[] = [
-  { name: 'emerald', text: 'text-emerald-400', bg: 'bg-emerald-400', soft: 'bg-emerald-400/15', border: 'border-emerald-400/40' },
-  { name: 'sky', text: 'text-sky-400', bg: 'bg-sky-400', soft: 'bg-sky-400/15', border: 'border-sky-400/40' },
-  { name: 'violet', text: 'text-violet-400', bg: 'bg-violet-400', soft: 'bg-violet-400/15', border: 'border-violet-400/40' },
-  { name: 'amber', text: 'text-amber-400', bg: 'bg-amber-400', soft: 'bg-amber-400/15', border: 'border-amber-400/40' },
-  { name: 'rose', text: 'text-rose-400', bg: 'bg-rose-400', soft: 'bg-rose-400/15', border: 'border-rose-400/40' },
-  { name: 'cyan', text: 'text-cyan-400', bg: 'bg-cyan-400', soft: 'bg-cyan-400/15', border: 'border-cyan-400/40' },
-  { name: 'lime', text: 'text-lime-400', bg: 'bg-lime-400', soft: 'bg-lime-400/15', border: 'border-lime-400/40' },
-  { name: 'fuchsia', text: 'text-fuchsia-400', bg: 'bg-fuchsia-400', soft: 'bg-fuchsia-400/15', border: 'border-fuchsia-400/40' }
+  { name: 'emerald', text: 'text-emerald-400', bg: 'bg-emerald-400', soft: 'bg-emerald-400/15', strong: 'bg-emerald-400/30', border: 'border-emerald-400/40' },
+  { name: 'sky', text: 'text-sky-400', bg: 'bg-sky-400', soft: 'bg-sky-400/15', strong: 'bg-sky-400/30', border: 'border-sky-400/40' },
+  { name: 'violet', text: 'text-violet-400', bg: 'bg-violet-400', soft: 'bg-violet-400/15', strong: 'bg-violet-400/30', border: 'border-violet-400/40' },
+  { name: 'amber', text: 'text-amber-400', bg: 'bg-amber-400', soft: 'bg-amber-400/15', strong: 'bg-amber-400/30', border: 'border-amber-400/40' },
+  { name: 'rose', text: 'text-rose-400', bg: 'bg-rose-400', soft: 'bg-rose-400/15', strong: 'bg-rose-400/30', border: 'border-rose-400/40' },
+  { name: 'cyan', text: 'text-cyan-400', bg: 'bg-cyan-400', soft: 'bg-cyan-400/15', strong: 'bg-cyan-400/30', border: 'border-cyan-400/40' },
+  { name: 'lime', text: 'text-lime-400', bg: 'bg-lime-400', soft: 'bg-lime-400/15', strong: 'bg-lime-400/30', border: 'border-lime-400/40' },
+  { name: 'fuchsia', text: 'text-fuchsia-400', bg: 'bg-fuchsia-400', soft: 'bg-fuchsia-400/15', strong: 'bg-fuchsia-400/30', border: 'border-fuchsia-400/40' }
 ]
 
 // unknown/system actors and anything not in the roster
@@ -211,6 +227,7 @@ const GRAY: ActorColor = {
   text: 'text-slate-400',
   bg: 'bg-slate-400',
   soft: 'bg-slate-400/15',
+  strong: 'bg-slate-400/30',
   border: 'border-slate-400/40'
 }
 
@@ -270,11 +287,46 @@ export function actorShort(id: string): string {
   return id.includes(':') ? id.split(':')[1] : id
 }
 
+/** "Alex" -> "Al", "dastin-claude" -> "DC", "Alice M." -> "AM". */
+export function initials(name: string): string {
+  const parts = name.split(/[\s_\-./]+/).filter(Boolean)
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
+  const w = parts[0] || '?'
+  return (w[0].toUpperCase() + (w[1] || '')).slice(0, 2)
+}
+
+export function timeAgo(ts: number): string {
+  const s = Math.max(0, Math.round((Date.now() - ts) / 1000))
+  if (s < 60) return 'just now'
+  const m = Math.round(s / 60)
+  if (m < 60) return `${m} min ago`
+  const h = Math.round(m / 60)
+  if (h < 24) return `${h} h ago`
+  return `${Math.round(h / 24)} d ago`
+}
+
 // Per-file collaboration marks for the MAIN changes list: who is on a file
-// (dot colour, cursor line when known) and whether it is locked.
+// (with their colour, cursor line and last edit time) and whether it is locked.
 export interface CollabMark {
-  actors: { id: string; name: string; bg: string; line?: number }[]
+  actors: {
+    id: string
+    name: string
+    bg: string
+    text: string
+    line?: number
+    at?: number
+    editing?: boolean
+  }[]
   lock?: { by: string; byName: string; reason: string; hard: boolean; mine: boolean }
+}
+
+/** "edited just now, on line 4" - the status half of a presence sentence. */
+export function presenceLabel(a: CollabMark['actors'][number]): string {
+  const bits: string[] = []
+  if (a.editing) bits.push(a.at ? `edited ${timeAgo(a.at)}` : 'editing')
+  if (a.line !== undefined) bits.push(`on line ${a.line}`)
+  if (!bits.length) bits.push('viewing this file')
+  return bits.join(', ')
 }
 
 export function buildCollabMarks(state: RtcState): Map<string, CollabMark> {
@@ -288,25 +340,28 @@ export function buildCollabMarks(state: RtcState): Map<string, CollabMark> {
     return m
   }
   const nameOf = (id: string) => state.actors.find((a) => a.id === id)?.displayName || actorShort(id)
-  const touch = (path: string, id: string, line?: number) => {
+  const touch = (path: string, id: string, extra: { line?: number; at?: number; editing?: boolean } = {}) => {
     if (!id || id === 'unknown') return
     const m = mark(path.replace(/\\/g, '/'))
     const existing = m.actors.find((a) => a.id === id)
     if (existing) {
-      if (line !== undefined) existing.line = line
+      if (extra.line !== undefined) existing.line = extra.line
+      if (extra.at !== undefined) existing.at = extra.at
+      if (extra.editing) existing.editing = true
       return
     }
-    m.actors.push({ id, name: nameOf(id), bg: actorColor(state.actors, id).bg, ...(line !== undefined ? { line } : {}) })
+    const c = actorColor(state.actors, id)
+    m.actors.push({ id, name: nameOf(id), bg: c.bg, text: c.text, ...extra })
   }
 
-  for (const c of state.changes) touch(c.path, c.actorId)
+  for (const c of state.changes) touch(c.path, c.actorId, { at: c.at, editing: true })
   for (const a of state.actors) {
     for (const f of a.activeFiles || []) touch(f, a.id)
-    if (a.cursor) touch(a.cursor.path, a.id, a.cursor.line)
+    if (a.cursor) touch(a.cursor.path, a.id, { line: a.cursor.line })
   }
   for (const [id, p] of Object.entries(state.presence)) {
     for (const f of p.activeFiles || []) touch(f, id)
-    if (p.cursor) touch(p.cursor.path, id, p.cursor.line)
+    if (p.cursor) touch(p.cursor.path, id, { line: p.cursor.line })
   }
 
   const now = Date.now()

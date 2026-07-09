@@ -19,7 +19,8 @@ import {
   basename,
   relTime
 } from './api'
-import { RtcState, buildCollabMarks } from './rtc'
+import { RtcState, buildCollabMarks, presenceLabel } from './rtc'
+import Avatar from './components/Avatar'
 import FileList from './components/FileList'
 import RepoTree from './components/RepoTree'
 import FilePreview from './components/FilePreview'
@@ -2141,6 +2142,35 @@ export default function App() {
                   </>
                 )}
               </div>
+              {/* who else is on this file right now, IDE-style */}
+              {__COLLAB__ && collabMarks?.get(sel.file.path) && (() => {
+                const m = collabMarks.get(sel.file.path)!
+                return (
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-ink-800 bg-ink-850/60 px-4 py-1.5">
+                    {m.actors.map((a) => (
+                      <span key={a.id} className="flex items-center gap-1.5 text-[11px]">
+                        <Avatar name={a.name} bg={a.bg} size={16} />
+                        <span className={`font-medium ${a.text}`}>{a.name}</span>
+                        <span className="text-slate-400">{presenceLabel(a)}</span>
+                      </span>
+                    ))}
+                    {m.lock && (
+                      <span
+                        className={`flex items-center gap-1 text-[11px] ${m.lock.mine ? 'text-amber-300' : 'text-bad'}`}
+                        title={m.lock.mine ? 'You hold this lock.' : 'Someone else locked this file - treat it as read-only.'}
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={m.lock.hard ? 2.6 : 1.8} className="h-3 w-3">
+                          <rect x="5" y="11" width="14" height="9" rx="2" />
+                          <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                        </svg>
+                        {m.lock.hard ? 'hard-locked' : 'locked'} by {m.lock.byName}
+                        {m.lock.reason ? `: ${m.lock.reason}` : ''}
+                        {m.lock.mine ? ' (yours)' : ' - read-only'}
+                      </span>
+                    )}
+                  </div>
+                )
+              })()}
               <div className="min-h-0 flex-1 overflow-auto">
                 {viewTab !== 'diff' ? (
                   <FileContent
@@ -2535,7 +2565,17 @@ export default function App() {
         <HistoryPanel cwd={cwd} path={historyPath} onClose={() => setHistoryPath(null)} />
       )}
       {blamePath && (
-        <BlamePanel cwd={cwd} path={blamePath} toast={(k, t) => toast(k, t)} onClose={() => setBlamePath(null)} />
+        <BlamePanel
+          cwd={cwd}
+          path={blamePath}
+          live={
+            __COLLAB__ && rtcLive
+              ? { actors: rtcLive.actors, segments: rtcLive.liveblame ?? [], changes: rtcLive.changes }
+              : undefined
+          }
+          toast={(k, t) => toast(k, t)}
+          onClose={() => setBlamePath(null)}
+        />
       )}
       {rebaseBase && (
         <InteractiveRebasePanel

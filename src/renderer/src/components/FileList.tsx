@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { FileEntry, NumstatEntry, RepoStatus, WorkingNumstat, basename, dirname } from '../api'
-import { CollabMark } from '../rtc'
+import { CollabMark, presenceLabel } from '../rtc'
+import Avatar from './Avatar'
 import { IconBlocked, IconCheck, IconChevronDown, IconChevronRight, IconArrowLeft } from './Icons'
 
 interface Props {
@@ -21,7 +22,7 @@ interface Props {
   onHistory: (path: string) => void
 }
 
-/** Coloured presence dots + a lock glyph for one row of the changes list. */
+/** Initials avatars + a lock glyph for one row of the changes list. */
 function CollabBadges({ mark }: { mark?: CollabMark }) {
   if (!mark || (!mark.actors.length && !mark.lock)) return null
   const lockTitle = mark.lock
@@ -31,13 +32,11 @@ function CollabBadges({ mark }: { mark?: CollabMark }) {
     : ''
   return (
     <span className="flex shrink-0 items-center gap-1">
-      {mark.actors.slice(0, 3).map((a) => (
-        <span
-          key={a.id}
-          title={`${a.name} is on this file${a.line !== undefined ? ` (line ${a.line})` : ''}`}
-          className={`h-2 w-2 rounded-full ${a.bg}`}
-        />
-      ))}
+      <span className="flex items-center -space-x-1.5">
+        {mark.actors.slice(0, 3).map((a) => (
+          <Avatar key={a.id} name={a.name} bg={a.bg} size={18} title={`${a.name} - ${presenceLabel(a)}`} />
+        ))}
+      </span>
       {mark.actors.length > 3 && <span className="text-[10px] text-slate-500">+{mark.actors.length - 3}</span>}
       {mark.lock && (
         <svg

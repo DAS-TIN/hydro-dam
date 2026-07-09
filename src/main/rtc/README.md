@@ -40,6 +40,9 @@ it in place - that is the "install the extension" story.
                   committing only ever happen from the Approve button
 - baselines.mjs   per-actor file snapshots so an assistant can detect edits
                   made by others between its read and its write
+- liveblame.mjs   who wrote which uncommitted lines: segments derived from the
+                  diff against HEAD, merged so untouched ranges keep their
+                  author; the blame panel overlays them on git blame
 - context.mjs     writes .rtc/context.md, per-task and per-agent briefs,
                   locks/actors JSON, and the hydrodam-collab skill file
 - watcher.mjs     debounced fs.watch over manifest files only

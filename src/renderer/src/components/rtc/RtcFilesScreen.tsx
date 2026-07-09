@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { api, humanSize } from '../../api'
 import { RtcState, actorColor } from '../../rtc'
-import { ActorChip, Section, EmptyNote, IconLock, IconCaret, inputCls } from './bits'
+import Avatar from '../Avatar'
+import { ActorChip, EmptyNote, IconLock, IconCaret, inputCls } from './bits'
 
 const MODE_STYLE: Record<string, string> = {
   live: 'bg-emerald-400/15 text-emerald-300',
@@ -143,7 +144,8 @@ export default function RtcFilesScreen({
                     )}
                     {who.map((id) => {
                       const c = actorColor(state.actors, id)
-                      return <span key={id} title={id} className={`h-2 w-2 shrink-0 rounded-full ${c.bg}`} />
+                      const name = state.actors.find((a) => a.id === id)?.displayName || id
+                      return <Avatar key={id} name={name} bg={c.bg} size={16} title={name} />
                     })}
                     {lock && (
                       <IconLock
