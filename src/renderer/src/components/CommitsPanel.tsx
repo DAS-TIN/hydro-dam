@@ -87,7 +87,7 @@ const BranchGlyph = () => (
   </svg>
 )
 
-// GitKraken-style ref labels: squared boxes with a branch/tag glyph.
+// Ref labels: squared boxes with a branch/tag glyph.
 function RefChip({
   label,
   onDragStart,
@@ -122,7 +122,7 @@ function RefChip({
       title={drag ? `Drag ${text} onto a commit (move) or another branch (merge/rebase)` : text}
       className={`inline-flex max-w-[180px] shrink-0 items-center gap-1.5 rounded border px-2 py-0.5 text-[11px] font-semibold ${cls} ${
         drag ? 'cursor-grab' : ''
-      } ${onDropBranch ? 'ring-1 ring-accent' : ''}`}
+      } ${onDropBranch ? 'ring-2 ring-accent animate-pulse' : ''}`}
     >
       {icon}
       <span className="truncate">{text}</span>
@@ -288,7 +288,7 @@ export default function CommitsPanel({
         }, `Cherry-picked ${c.shortHash} onto ${target}.`)
     })
 
-  // Drag a branch chip onto a commit to move/reset it there (GitKraken-style).
+  // Drag a branch chip onto a commit to move/reset it there.
   const onDropCommit = (c: GraphCommit) => {
     const b = dragBranch
     setDragBranch(null)
@@ -478,6 +478,24 @@ export default function CommitsPanel({
             {!loadingList && commits.length === 0 && (
               <div className="p-4 text-sm text-slate-500">No commits match.</div>
             )}
+            {(dragBranch || dragCommit) && (
+              // What a drop will do, spelled out while you hold the drag.
+              <div className="pointer-events-none sticky top-0 z-20 flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-accent/40 bg-ink-900/95 px-3 py-1.5 text-[11px] text-slate-300 backdrop-blur">
+                <span className="rounded bg-accent/20 px-1.5 py-0.5 font-semibold text-accent">
+                  {dragBranch ? dragBranch.name : dragCommit!.shortHash}
+                </span>
+                {dragBranch ? (
+                  <span>
+                    drop on a <b className="text-slate-100">commit</b> to move it there, or on{' '}
+                    <b className="text-slate-100">another branch</b> to merge / rebase
+                  </span>
+                ) : (
+                  <span>
+                    drop on a <b className="text-slate-100">branch</b> to cherry-pick it there
+                  </span>
+                )}
+              </div>
+            )}
             {!loadingList && commits.length > 0 && (
               <div className="relative" style={{ height: commits.length * ROW_H }}>
                 {/* graph edges + nodes */}
@@ -557,7 +575,7 @@ export default function CommitsPanel({
                     }}
                     className={`absolute right-0 flex flex-col justify-center border-b border-ink-850 px-3 text-left transition-colors ${
                       sel?.hash === c.hash ? 'bg-ink-750' : 'hover:bg-ink-850'
-                    } ${dragBranch ? 'hover:ring-1 hover:ring-inset hover:ring-accent' : ''}`}
+                    } ${dragBranch ? 'ring-1 ring-inset ring-accent/25 hover:ring-accent' : ''}`}
                     style={{ top: i * ROW_H, height: ROW_H, left: graphW, width: `calc(100% - ${graphW}px)` }}
                   >
                     <div className="flex items-center gap-2">
