@@ -35,7 +35,14 @@ import {
   IconRefresh,
   IconGear,
   IconLogo,
-  IconHelp
+  IconHelp,
+  IconUndo,
+  IconRedo,
+  IconRevert,
+  IconStash,
+  IconPop,
+  IconReview,
+  IconFetch
 } from './components/Icons'
 import { PromptHost, promptDialog } from './components/PromptModal'
 import CommitsPanel from './components/CommitsPanel'
@@ -129,6 +136,48 @@ function FocusHalo({ on }: { on: boolean }) {
 // One in-app undoable operation (stage, unstage, hide...). Git itself is the
 // source of truth; undo/redo just replay the inverse command.
 type UndoOp = { label: string; undo: () => Promise<unknown>; redo: () => Promise<unknown> }
+
+// A compact top-bar action: icon over label, with an optional count badge.
+function ToolBtn({
+  icon,
+  label,
+  onClick,
+  title,
+  disabled,
+  badge,
+  accent
+}: {
+  icon: React.ReactNode
+  label: string
+  onClick: () => void
+  title: string
+  disabled?: boolean
+  badge?: number
+  accent?: boolean
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className={`flex w-[52px] shrink-0 flex-col items-center gap-0.5 rounded-md px-1 py-1 text-[10px] font-medium transition-colors disabled:opacity-40 disabled:pointer-events-none ${
+        accent ? 'text-accent hover:bg-accent/10' : 'text-slate-300 hover:bg-ink-800 hover:text-white'
+      }`}
+    >
+      <span className="relative">
+        {icon}
+        {!!badge && (
+          <span className="absolute -right-2.5 -top-1.5 rounded-full bg-accent px-1 text-[9px] font-bold leading-[1.4] text-white">
+            {badge}
+          </span>
+        )}
+      </span>
+      <span>{label}</span>
+    </button>
+  )
+}
+
+const ToolDivider = () => <span className="mx-1 h-7 w-px shrink-0 self-center bg-ink-700" />
 
 const DEFAULT_SETTINGS: Settings = {
   showLegend: true,
@@ -1629,61 +1678,92 @@ export default function App() {
 
         <div className="flex-1" />
 
-        <button
-          className="btn-ghost px-2"
-          disabled={busy}
-          onClick={() => {
-            loadIdentity()
-            run(() => refresh(), 'Refreshed.')
-          }}
-          title="Force refresh - re-read the working tree, branches and identity now"
-        >
-          <IconRefresh className="w-4 h-4" />
-        </button>
-        <button
-          className="btn-ghost"
-          disabled={busy}
-          onClick={() => run(() => A.fetch(cwd).then(() => refresh()), 'Fetched.')}
-          title="Check the remote for new commits without touching your files (git fetch)"
-        >
-          Fetch
-        </button>
-        <button
-          className="btn-ghost"
-          disabled={busy}
-          onClick={() => run(() => A.pull(cwd).then(() => refresh()), 'Pulled.')}
-          title="Update this branch with the latest changes from the remote (git pull)"
-        >
-          Pull{status && status.behind > 0 ? <span className="inline-flex items-center gap-0.5 ml-1"><IconArrowDown className="w-3 h-3" />{status.behind}</span> : ''}
-        </button>
-        {status && !status.detached && (
-          <button
-            className="btn-ghost"
+        {/* grouped action tools: local edits, then sync, then stash */}
+        <div className="flex items-center gap-0.5">
+          <ToolBtn
+            icon={<IconRefresh className="w-[18px] h-[18px]" />}
+            label="Refresh"
             disabled={busy}
-            onClick={() => doRevertLast()}
-            title="Add a commit that undoes the last one (git revert HEAD) - safe after a push"
-          >
-            Revert
-          </button>
-        )}
-        {status && status.ahead > 0 && (
-          <button
-            className="btn-ghost"
+            onClick={() => {
+              loadIdentity()
+              run(() => refresh(), 'Refreshed.')
+            }}
+            title="Re-read the working tree, branches and identity now"
+          />
+          <ToolDivider />
+          <ToolBtn
+            icon={<IconUndo className="w-[18px] h-[18px]" />}
+            label="Undo"
+            disabled={busy || undoStack.length === 0}
+            onClick={doUndoOp}
+            title={undoStack.length ? `Undo: ${undoStack[undoStack.length - 1].label}` : 'Nothing to undo'}
+          />
+          <ToolBtn
+            icon={<IconRedo className="w-[18px] h-[18px]" />}
+            label="Redo"
+            disabled={busy || redoStack.length === 0}
+            onClick={doRedoOp}
+            title={redoStack.length ? `Redo: ${redoStack[redoStack.length - 1].label}` : 'Nothing to redo'}
+          />
+          {status && !status.detached && (
+            <ToolBtn
+              icon={<IconRevert className="w-[18px] h-[18px]" />}
+              label="Revert"
+              disabled={busy}
+              onClick={() => doRevertLast()}
+              title="Add a commit that undoes the last one (git revert HEAD) - safe after a push"
+            />
+          )}
+          <ToolDivider />
+          <ToolBtn
+            icon={<IconFetch className="w-[18px] h-[18px]" />}
+            label="Fetch"
             disabled={busy}
-            onClick={() => setShowPushPreview(true)}
-            title="Review the commits you're about to push, with their co-authors"
-          >
-            Review
-          </button>
-        )}
-        <button
-          className="btn-accent"
-          disabled={busy}
-          onClick={() => pushWithGuard()}
-          title="Upload your local commits to the remote (git push)"
-        >
-          Push{status && status.ahead > 0 ? <span className="inline-flex items-center gap-0.5 ml-1"><IconArrowUp className="w-3 h-3" />{status.ahead}</span> : ''}
-        </button>
+            onClick={() => run(() => A.fetch(cwd).then(() => refresh()), 'Fetched.')}
+            title="Check the remote for new commits without touching your files (git fetch)"
+          />
+          <ToolBtn
+            icon={<IconArrowDown className="w-[18px] h-[18px]" />}
+            label="Pull"
+            disabled={busy}
+            badge={status?.behind || undefined}
+            onClick={() => run(() => A.pull(cwd).then(() => refresh()), 'Pulled.')}
+            title="Update this branch with the latest changes from the remote (git pull)"
+          />
+          {status && status.ahead > 0 && (
+            <ToolBtn
+              icon={<IconReview className="w-[18px] h-[18px]" />}
+              label="Review"
+              disabled={busy}
+              onClick={() => setShowPushPreview(true)}
+              title="Review the commits you're about to push, with their co-authors"
+            />
+          )}
+          <ToolBtn
+            icon={<IconArrowUp className="w-[18px] h-[18px]" />}
+            label="Push"
+            accent
+            disabled={busy}
+            badge={status?.ahead || undefined}
+            onClick={() => pushWithGuard()}
+            title="Upload your local commits to the remote (git push)"
+          />
+          <ToolDivider />
+          <ToolBtn
+            icon={<IconStash className="w-[18px] h-[18px]" />}
+            label="Stash"
+            disabled={busy}
+            onClick={() => setShowStash(true)}
+            title="Shelve your working changes for later (git stash)"
+          />
+          <ToolBtn
+            icon={<IconPop className="w-[18px] h-[18px]" />}
+            label="Pop"
+            disabled={busy}
+            onClick={() => run(() => A.stashPop(cwd).then(() => refresh()), 'Stash popped.')}
+            title="Re-apply and drop the most recent stash (git stash pop)"
+          />
+        </div>
       </div>
 
 
