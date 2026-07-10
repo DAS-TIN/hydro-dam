@@ -890,6 +890,103 @@ export async function cherryPick(cwd: string, hash: string): Promise<string> {
   return git(cwd, ['cherry-pick', hash])
 }
 
+export type ReflectStatus = 'applied' | 'already' | 'conflict' | 'failed'
+export interface ReflectResult {
+  branch: string
+  status: ReflectStatus
+  hash?: string // short sha of the copy created on the target
+  message?: string // one-line reason when failed
+}
+
+// git's hash for the empty tree, used to diff a root commit (no parent).
+const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
+
+// Copy one commit's changes onto another local branch as a NEW commit, without
+// moving the caller's HEAD. The work happens in a throwaway worktree so the tree
+// the user is looking at never changes; a branch that is live in another
+// worktree or that the change clashes with is reported, never half-applied.
+// paths (optional) limits the copy to those files - the "just these bits" case.
+async function reflectOne(cwd: string, sha: string, branch: string, paths: string[]): Promise<ReflectResult> {
+  // Whole commit already in this branch's history? Then its files are too.
+  const has = await git(cwd, ['merge-base', '--is-ancestor', sha, branch]).then(
+    () => true,
+    () => false
+  )
+  if (has) return { branch, status: 'already' }
+
+  let dir: string | null = null
+  try {
+    dir = mkdtempSync(join(tmpdir(), 'hydrodam-reflect-'))
+    await git(cwd, ['worktree', 'add', '--quiet', dir, branch])
+    return paths.length ? await applyPartial(cwd, dir, sha, branch, paths) : await applyWhole(dir, sha, branch)
+  } catch (err: any) {
+    return { branch, status: 'failed', message: (err?.message || String(err)).split('\n')[0] }
+  } finally {
+    if (dir) await git(cwd, ['worktree', 'remove', '--force', dir]).catch(() => {})
+  }
+}
+
+// Whole commit: a plain cherry-pick, which brings git's own 3-way merge.
+async function applyWhole(dir: string, sha: string, branch: string): Promise<ReflectResult> {
+  try {
+    await git(dir, ['cherry-pick', sha])
+  } catch {
+    const conflicts = (await git(dir, ['diff', '--name-only', '--diff-filter=U']).catch(() => '')).trim()
+    await git(dir, ['cherry-pick', '--abort']).catch(() => {})
+    // no unmerged paths means the patch was already present (empty pick)
+    return { branch, status: conflicts ? 'conflict' : 'already' }
+  }
+  const head = (await git(dir, ['rev-parse', '--short', 'HEAD']).catch(() => '')).trim()
+  return { branch, status: 'applied', hash: head || undefined }
+}
+
+// Only some files: slice the commit's diff to those paths and apply just that,
+// three-way so it merges what it can and a genuine clash surfaces instead of
+// dragging the files we were told to leave alone.
+async function applyPartial(
+  cwd: string,
+  dir: string,
+  sha: string,
+  branch: string,
+  paths: string[]
+): Promise<ReflectResult> {
+  const parent = await git(cwd, ['rev-parse', `${sha}^`]).then((s) => s.trim(), () => EMPTY_TREE)
+  const patch = await git(cwd, ['diff', parent, sha, '--', ...paths])
+  if (!patch.trim()) return { branch, status: 'already' }
+  // patch already sitting on the target? reverse-check applies cleanly then.
+  const already = await git(dir, ['apply', '--reverse', '--check'], { input: patch }).then(() => true, () => false)
+  if (already) return { branch, status: 'already' }
+  try {
+    await git(dir, ['apply', '--3way', '--index'], { input: patch })
+  } catch {
+    await git(dir, ['reset', '--hard', '--quiet']).catch(() => {})
+    await git(dir, ['clean', '-fd', '--quiet']).catch(() => {})
+    return { branch, status: 'conflict' }
+  }
+  try {
+    await git(dir, ['commit', '-C', sha]) // reuse the original message and author
+  } catch {
+    return { branch, status: 'already' }
+  }
+  const head = (await git(dir, ['rev-parse', '--short', 'HEAD']).catch(() => '')).trim()
+  return { branch, status: 'applied', hash: head || undefined }
+}
+
+/**
+ * Copy a commit's changes onto each named local branch. With no paths the whole
+ * commit is cherry-picked; with paths, only those files are carried over.
+ */
+export async function reflectCommit(
+  cwd: string,
+  sha: string,
+  branches: string[],
+  paths: string[] = []
+): Promise<ReflectResult[]> {
+  const out: ReflectResult[] = []
+  for (const b of branches) out.push(await reflectOne(cwd, sha, b, paths))
+  return out
+}
+
 export async function revertCommit(cwd: string, hash: string): Promise<string> {
   return git(cwd, ['revert', '--no-edit', hash])
 }

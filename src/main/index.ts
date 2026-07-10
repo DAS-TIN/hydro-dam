@@ -579,6 +579,9 @@ handle('log:graph', (cwd: string, q: G.LogQuery) => G.logGraph(cwd, q ?? {}))
 handle('blame', (cwd: string, path: string) => G.blame(cwd, path))
 
 handle('commit:cherryPick', (cwd: string, hash: string) => G.cherryPick(cwd, hash))
+handle('commit:reflect', (cwd: string, sha: string, branches: string[], paths?: string[]) =>
+  G.reflectCommit(cwd, sha, branches, paths ?? [])
+)
 handle('commit:revert', (cwd: string, hash: string) => G.revertCommit(cwd, hash))
 handle('commit:reset', (cwd: string, hash: string, mode: 'soft' | 'mixed' | 'hard') =>
   G.resetTo(cwd, hash, mode)
