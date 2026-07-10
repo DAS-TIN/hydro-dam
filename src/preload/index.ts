@@ -67,6 +67,8 @@ const api = {
 
   //commit actions
   cherryPick: (cwd: string, hash: string) => call<string>('commit:cherryPick', cwd, hash),
+  reflectCommit: (cwd: string, sha: string, branches: string[], paths?: string[]) =>
+    call<any[]>('commit:reflect', cwd, sha, branches, paths),
   revertCommit: (cwd: string, hash: string) => call<string>('commit:revert', cwd, hash),
   resetTo: (cwd: string, hash: string, mode: 'soft' | 'mixed' | 'hard') =>
     call<void>('commit:reset', cwd, hash, mode),

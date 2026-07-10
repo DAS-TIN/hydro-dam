@@ -254,6 +254,11 @@ export default function App() {
   const [previewPath, setPreviewPath] = useState<string | null>(null)
 
   const [message, setMessage] = useState('')
+  // other local branches to copy this commit onto (cherry-pick), chosen at commit time
+  const [reflectTargets, setReflectTargets] = useState<string[]>([])
+  // when copying to other branches, which files go over - empty = the whole commit
+  const [reflectPick, setReflectPick] = useState(false)
+  const [reflectFiles, setReflectFiles] = useState<string[]>([])
   const [amend, setAmend] = useState(false)
   const [busy, setBusy] = useState(false)
   const [showCoauthors, setShowCoauthors] = useState(false)
@@ -533,6 +538,13 @@ export default function App() {
     api().tree(cwd).then(setTreePaths).catch(() => {})
   }, [cwd, leftMode, status])
 
+  // A target picked for one branch/repo makes no sense on another - clear it.
+  useEffect(() => {
+    setReflectTargets([])
+    setReflectPick(false)
+    setReflectFiles([])
+  }, [status?.branch, cwd])
+
   //Load the commit identity (who you're committing as) for the open repo.
   const loadIdentity = useCallback(() => {
     if (cwd) api().identityGet(cwd).then(setIdentity).catch(() => {})
@@ -571,10 +583,32 @@ export default function App() {
       return
     }
     const active = coauthors.filter((c) => c.enabled)
-    await run(
+    const committed = await run(
       () => A.commit(cwd, message, active, amend),
       `Committed${active.length ? ` with ${active.length} co-author(s)` : ''}.`
     )
+    // Copy this same change onto the branches picked below, as independent
+    // commits, without leaving the current branch. Only after a real commit.
+    if (committed !== undefined && reflectTargets.length) {
+      // an unchecked file means copy only the picked subset; all checked (or the
+      // picker closed) means the whole commit
+      const staged = status?.files.filter((f) => f.staged).map((f) => f.path) ?? []
+      const subset = reflectPick && reflectFiles.length > 0 && reflectFiles.length < staged.length
+      const paths = subset ? reflectFiles : []
+      const results = await api().reflectCommit(cwd, 'HEAD', reflectTargets, paths).catch(() => [])
+      const done = results.filter((r) => r.status === 'applied').map((r) => r.branch)
+      const had = results.filter((r) => r.status === 'already').map((r) => r.branch)
+      if (done.length) toast('ok', `Copied to ${done.join(', ')}.`)
+      if (had.length) toast('info', `Already on ${had.join(', ')}.`)
+      for (const r of results.filter((r) => r.status === 'conflict' || r.status === 'failed')) {
+        toast('err', r.status === 'conflict'
+          ? `${r.branch}: doesn't apply cleanly - copy it there by hand.`
+          : `${r.branch}: ${r.message || 'could not copy'}.`)
+      }
+      setReflectTargets([])
+      setReflectPick(false)
+      setReflectFiles([])
+    }
     // Immediately verify the commit we just wrote wasn't rewritten by a hook.
     const tamper = await api().commitTamperCheck(cwd).catch(() => ({ injected: [], dropped: [] }))
     if (tamper.injected.length) {
@@ -2357,6 +2391,92 @@ export default function App() {
               />
               Amend last commit
             </label>
+
+            {/* copy this commit onto other branches too (cherry-pick), no branch switch */}
+            {branches.filter((b) => !b.current).length > 0 && (
+              <div className="rounded-lg border border-ink-700/60 p-2">
+                <div className="mb-1 flex items-center justify-between text-[11px] text-slate-500">
+                  <span>Also copy to</span>
+                  {reflectTargets.length > 0 && (
+                    <span className="text-accent">{reflectTargets.length} selected</span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {branches
+                    .filter((b) => !b.current)
+                    .map((b) => {
+                      const on = reflectTargets.includes(b.name)
+                      return (
+                        <button
+                          key={b.name}
+                          onClick={() =>
+                            setReflectTargets((t) =>
+                              on ? t.filter((x) => x !== b.name) : [...t, b.name]
+                            )
+                          }
+                          title={`Copy this commit onto ${b.name} as a new commit`}
+                          className={`rounded border px-2 py-0.5 text-[11px] ${
+                            on
+                              ? 'border-accent bg-accent/15 text-accent'
+                              : 'border-ink-700 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          {b.name}
+                        </button>
+                      )
+                    })}
+                </div>
+                {reflectTargets.length > 0 && (() => {
+                  const staged = status?.files.filter((f) => f.staged) ?? []
+                  const subset = reflectPick && reflectFiles.length > 0 && reflectFiles.length < staged.length
+                  return (
+                    <div className="mt-1.5 space-y-1.5">
+                      {staged.length > 1 && (
+                        <button
+                          className="text-[10px] text-accent hover:underline"
+                          onClick={() =>
+                            setReflectPick((v) => {
+                              if (!v) setReflectFiles(staged.map((f) => f.path)) // start with all ticked
+                              return !v
+                            })
+                          }
+                        >
+                          {reflectPick ? 'Copy the whole commit instead' : 'Choose which files to copy...'}
+                        </button>
+                      )}
+                      {reflectPick && staged.length > 1 && (
+                        <div className="max-h-28 space-y-0.5 overflow-auto rounded border border-ink-800 bg-ink-950 p-1">
+                          {staged.map((f) => {
+                            const on = reflectFiles.includes(f.path)
+                            return (
+                              <label
+                                key={f.path}
+                                className="flex cursor-pointer items-center gap-1.5 px-1 text-[11px] text-slate-300 hover:text-slate-100"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={on}
+                                  className="accent-accent"
+                                  onChange={() =>
+                                    setReflectFiles((s) => (on ? s.filter((x) => x !== f.path) : [...s, f.path]))
+                                  }
+                                />
+                                <span className="truncate font-mono">{f.path}</span>
+                              </label>
+                            )
+                          })}
+                        </div>
+                      )}
+                      <div className="text-[10px] text-slate-600">
+                        {subset
+                          ? `Only ${reflectFiles.length} of ${staged.length} files copied onto each - they stay separate branches.`
+                          : 'Cherry-picked onto each after committing - they stay separate branches.'}
+                      </div>
+                    </div>
+                  )
+                })()}
+              </div>
+            )}
           </div>
 
           {/* footer */}

@@ -127,6 +127,15 @@ export interface BlameLine {
   content: string
 }
 
+export type ReflectStatus = 'applied' | 'already' | 'conflict' | 'failed'
+
+export interface ReflectResult {
+  branch: string
+  status: ReflectStatus
+  hash?: string
+  message?: string
+}
+
 export type Provider = 'github' | 'gitlab' | 'bitbucket' | 'azure'
 
 export interface RemoteRepo {
@@ -621,6 +630,7 @@ export interface HydrodamApi {
   logGraph(cwd: string, q: LogQuery): Promise<GraphCommit[]>
   blame(cwd: string, path: string): Promise<BlameLine[]>
   cherryPick(cwd: string, hash: string): Promise<string>
+  reflectCommit(cwd: string, sha: string, branches: string[], paths?: string[]): Promise<ReflectResult[]>
   revertCommit(cwd: string, hash: string): Promise<string>
   resetTo(cwd: string, hash: string, mode: 'soft' | 'mixed' | 'hard'): Promise<void>
   checkoutCommit(cwd: string, hash: string): Promise<void>
