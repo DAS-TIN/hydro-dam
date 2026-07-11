@@ -273,6 +273,14 @@ const api = {
   mcpStatus: () => call<any>('mcp:status'),
   mcpSetRepo: (cwd: string | null) => call<boolean>('mcp:setRepo', cwd),
 
+  // the log of git commands the app has run
+  commandLog: () => call<any[]>('git:log:commands'),
+  onGitCommand: (cb: (entry: any) => void) => {
+    const listener = (_e: unknown, entry: any) => cb(entry)
+    ipcRenderer.on('git:command', listener)
+    return () => ipcRenderer.removeListener('git:command', listener)
+  },
+
   // menu-driven actions from the native application menu
   onMenu: (
     cb: (

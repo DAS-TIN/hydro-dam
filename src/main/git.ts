@@ -17,6 +17,35 @@ const pExecFile = promisify(execFile)
 
 const MAX_BUFFER = 1024 * 1024 * 64 // 64MB - big monorepo diffs blow past the default 1MB
 
+// Every git invocation is recorded here so the UI can show exactly what the app
+// ran - Hydrodam shells out to real git, and this makes that honest and visible.
+export interface GitLogEntry {
+  id: number
+  args: string[]
+  ms: number
+  ok: boolean
+  error?: string // first line of stderr when it failed
+  at: number
+}
+const LOG_CAP = 300
+const commandLog: GitLogEntry[] = []
+let logSeq = 0
+const logListeners = new Set<(e: GitLogEntry) => void>()
+
+export function getCommandLog(): GitLogEntry[] {
+  return commandLog.slice()
+}
+export function onGitCommand(fn: (e: GitLogEntry) => void): () => void {
+  logListeners.add(fn)
+  return () => logListeners.delete(fn)
+}
+function recordCommand(args: string[], ms: number, ok: boolean, error?: string): void {
+  const e: GitLogEntry = { id: ++logSeq, args, ms: Math.round(ms), ok, error, at: Date.now() }
+  commandLog.push(e)
+  if (commandLog.length > LOG_CAP) commandLog.shift()
+  for (const fn of logListeners) fn(e)
+}
+
 /**
  * The function every other call goes through. Runs git <args> in cwd and
  * resolves with stdout. A non-zero exit throws an Error carrying git's stderr
@@ -27,6 +56,7 @@ const MAX_BUFFER = 1024 * 1024 * 64 // 64MB - big monorepo diffs blow past the d
  * up on Windows.
  */
 export async function git(cwd: string, args: string[], opts: { input?: string } = {}): Promise<string> {
+  const started = performance.now()
   try {
     const child = pExecFile('git', args, {
       cwd,
@@ -39,9 +69,11 @@ export async function git(cwd: string, args: string[], opts: { input?: string } 
       child.child.stdin.end()
     }
     const { stdout } = await child
+    recordCommand(args, performance.now() - started, true)
     return stdout
   } catch (err: any) {
     const msg = (err?.stderr || err?.message || String(err)).trim()
+    recordCommand(args, performance.now() - started, false, msg.split('\n')[0])
     throw new Error(msg)
   }
 }

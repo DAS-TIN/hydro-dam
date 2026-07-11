@@ -578,6 +578,13 @@ handle('lfs:pull', (cwd: string) => G.lfsPull(cwd))
 handle('log:graph', (cwd: string, q: G.LogQuery) => G.logGraph(cwd, q ?? {}))
 handle('blame', (cwd: string, path: string) => G.blame(cwd, path))
 
+// The command log: hand over the buffered history on open, then stream each new
+// git invocation to every window as it happens.
+handle('git:log:commands', () => G.getCommandLog())
+G.onGitCommand((e) => {
+  for (const w of BrowserWindow.getAllWindows()) w.webContents.send('git:command', e)
+})
+
 handle('commit:cherryPick', (cwd: string, hash: string) => G.cherryPick(cwd, hash))
 handle('commit:revert', (cwd: string, hash: string) => G.revertCommit(cwd, hash))
 handle('commit:reset', (cwd: string, hash: string, mode: 'soft' | 'mixed' | 'hard') =>

@@ -75,6 +75,7 @@ const BlamePanel = lazy(() => import('./components/BlamePanel'))
 const ConnectionsPanel = lazy(() => import('./components/ConnectionsPanel'))
 const InteractiveRebasePanel = lazy(() => import('./components/InteractiveRebasePanel'))
 const ReflogPanel = lazy(() => import('./components/ReflogPanel'))
+const CommandLogPanel = lazy(() => import('./components/CommandLogPanel'))
 const LFSPanel = lazy(() => import('./components/LFSPanel'))
 const TrackersPanel = lazy(() => import('./components/TrackersPanel'))
 const TrelloBoardView = lazy(() => import('./components/TrelloBoardView'))
@@ -267,6 +268,7 @@ export default function App() {
   const [showIssues, setShowIssues] = useState(false)
   const [rebaseBase, setRebaseBase] = useState<string | null>(null)
   const [showReflog, setShowReflog] = useState(false)
+  const [showCommandLog, setShowCommandLog] = useState(false)
   const [showLFS, setShowLFS] = useState(false)
   const [showTrackers, setShowTrackers] = useState(false)
   const [trackers, setTrackers] = useState<TrackerView[]>([])
@@ -917,6 +919,7 @@ export default function App() {
       [showIssues, () => setShowIssues(false)],
       [showWorktrees, () => setShowWorktrees(false)],
       [showReflog, () => setShowReflog(false)],
+      [showCommandLog, () => setShowCommandLog(false)],
       [showLFS, () => setShowLFS(false)],
       [showTrackers, () => setShowTrackers(false)],
       [showSecurity, () => setShowSecurity(false)],
@@ -2611,6 +2614,9 @@ export default function App() {
           onClose={() => setShowReflog(false)}
         />
       )}
+      {showCommandLog && (
+        <CommandLogPanel toast={(k, t) => toast(k, t)} onClose={() => setShowCommandLog(false)} />
+      )}
       {showLFS && (
         <LFSPanel
           cwd={cwd}
@@ -2693,6 +2699,7 @@ export default function App() {
               { label: 'Worktrees', run: () => setShowWorktrees(true) },
               { label: 'Submodules', run: () => setShowSubmodules(true) },
               { label: 'Reflog / Undo', run: () => setShowReflog(true) },
+              { label: 'Command log', run: () => setShowCommandLog(true) },
               { label: 'Ignore rules', run: () => setShowExcludes(true) },
               { label: 'Trackers', run: () => setShowTrackers(true) },
               { label: 'Signing & keys', run: () => setShowSecurity(true) },
