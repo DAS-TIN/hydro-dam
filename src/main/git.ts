@@ -1141,6 +1141,71 @@ export async function opSkip(cwd: string, kind: Exclude<OpKind, null>): Promise<
   return git(cwd, ['-c', 'core.editor=true', kind, '--skip'])
 }
 
+export interface BisectCommit {
+  hash: string
+  subject: string
+  author: string
+  relDate: string
+}
+
+export interface BisectState {
+  active: boolean
+  current: BisectCommit | null
+  remaining: number // revisions still to test
+  steps: number // roughly this many good/bad marks left
+  firstBad: BisectCommit | null
+}
+
+async function bisectShow(cwd: string, ref: string): Promise<BisectCommit> {
+  const sep = '\x1f'
+  const out = await git(cwd, ['show', '-s', `--format=%h${sep}%s${sep}%an${sep}%cr`, ref])
+  const [hash, subject, author, relDate] = out.trim().split(sep)
+  return { hash, subject, author, relDate }
+}
+
+/** Where a bisect session stands: the commit to test now, how many are left, and the culprit once found. */
+export async function bisectState(cwd: string): Promise<BisectState> {
+  const idle: BisectState = { active: false, current: null, remaining: 0, steps: 0, firstBad: null }
+  let gitDir: string
+  try {
+    gitDir = (await git(cwd, ['rev-parse', '--absolute-git-dir'])).trim()
+  } catch {
+    return idle
+  }
+  if (!existsSync(join(gitDir, 'BISECT_LOG'))) return idle
+
+  const current = await bisectShow(cwd, 'HEAD')
+  const goodRefs = (await git(cwd, ['for-each-ref', '--format=%(refname)', 'refs/bisect/good-*']))
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
+  let remaining = 0
+  let steps = 0
+  if (goodRefs.length) {
+    // git tracks the ends as refs/bisect/*; --bisect-vars reads the count back off them
+    // so we don't have to scrape "N revisions left" out of the human-facing output.
+    const vars = await git(cwd, ['rev-list', '--bisect-vars', 'refs/bisect/bad', '--not', ...goodRefs]).catch(() => '')
+    remaining = Number(/bisect_nr=(\d+)/.exec(vars)?.[1] ?? 0)
+    steps = Number(/bisect_steps=(\d+)/.exec(vars)?.[1] ?? 0)
+  }
+  // nothing left to test means HEAD is parked on the first bad commit
+  const firstBad = goodRefs.length && remaining === 0 ? current : null
+  return { active: true, current, remaining, steps, firstBad }
+}
+
+//`bisect start <bad> <good>` seeds both ends and checks out the midpoint in one go.
+export async function bisectStart(cwd: string, good: string, bad: string): Promise<string> {
+  return git(cwd, ['bisect', 'start', bad, good])
+}
+
+export async function bisectMark(cwd: string, verdict: 'good' | 'bad' | 'skip'): Promise<string> {
+  return git(cwd, ['bisect', verdict])
+}
+
+export async function bisectReset(cwd: string): Promise<string> {
+  return git(cwd, ['bisect', 'reset'])
+}
+
 //Rebase the current branch onto another branch/ref.
 export async function rebaseOnto(cwd: string, upstream: string): Promise<string> {
   return git(cwd, ['-c', 'core.editor=true', 'rebase', upstream])

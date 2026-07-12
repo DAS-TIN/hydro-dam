@@ -257,6 +257,21 @@ export interface OpState {
   conflicts: number
 }
 
+export interface BisectCommit {
+  hash: string
+  subject: string
+  author: string
+  relDate: string
+}
+
+export interface BisectState {
+  active: boolean
+  current: BisectCommit | null
+  remaining: number
+  steps: number
+  firstBad: BisectCommit | null
+}
+
 export interface ReflogEntry {
   selector: string
   shortHash: string
@@ -686,6 +701,10 @@ export interface HydrodamApi {
   opContinue(cwd: string, kind: string): Promise<string>
   opAbort(cwd: string, kind: string): Promise<string>
   opSkip(cwd: string, kind: string): Promise<string>
+  bisectState(cwd: string): Promise<BisectState>
+  bisectStart(cwd: string, good: string, bad: string): Promise<string>
+  bisectMark(cwd: string, verdict: 'good' | 'bad' | 'skip'): Promise<string>
+  bisectReset(cwd: string): Promise<string>
   rebaseBranch(cwd: string, upstream: string): Promise<string>
   rebaseList(cwd: string, base: string): Promise<RebaseCommit[]>
   rebaseInteractive(cwd: string, base: string, items: RebaseItem[]): Promise<string>

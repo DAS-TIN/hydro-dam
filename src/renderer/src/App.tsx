@@ -75,6 +75,7 @@ const BlamePanel = lazy(() => import('./components/BlamePanel'))
 const ConnectionsPanel = lazy(() => import('./components/ConnectionsPanel'))
 const InteractiveRebasePanel = lazy(() => import('./components/InteractiveRebasePanel'))
 const ReflogPanel = lazy(() => import('./components/ReflogPanel'))
+const BisectPanel = lazy(() => import('./components/BisectPanel'))
 const CommandLogPanel = lazy(() => import('./components/CommandLogPanel'))
 const LFSPanel = lazy(() => import('./components/LFSPanel'))
 const TrackersPanel = lazy(() => import('./components/TrackersPanel'))
@@ -268,6 +269,7 @@ export default function App() {
   const [showIssues, setShowIssues] = useState(false)
   const [rebaseBase, setRebaseBase] = useState<string | null>(null)
   const [showReflog, setShowReflog] = useState(false)
+  const [showBisect, setShowBisect] = useState(false)
   const [showCommandLog, setShowCommandLog] = useState(false)
   const [showLFS, setShowLFS] = useState(false)
   const [showTrackers, setShowTrackers] = useState(false)
@@ -1455,6 +1457,17 @@ export default function App() {
       run: () => setShowReflog(true)
     },
     {
+      key: 'bisect',
+      label: 'Bisect',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <circle cx="6" cy="6" r="2.4"/><circle cx="6" cy="18" r="2.4"/><circle cx="18" cy="12" r="2.4"/>
+          <path d="M8 7.2 15.8 11M8 16.8 15.8 13"/>
+        </svg>
+      ),
+      run: () => setShowBisect(true)
+    },
+    {
       key: 'ignore',
       label: 'Ignore rules',
       icon: (
@@ -2614,6 +2627,14 @@ export default function App() {
           onClose={() => setShowReflog(false)}
         />
       )}
+      {showBisect && (
+        <BisectPanel
+          cwd={cwd}
+          toast={(k, t) => toast(k, t)}
+          onChanged={() => refresh()}
+          onClose={() => setShowBisect(false)}
+        />
+      )}
       {showCommandLog && (
         <CommandLogPanel toast={(k, t) => toast(k, t)} onClose={() => setShowCommandLog(false)} />
       )}
@@ -2699,6 +2720,7 @@ export default function App() {
               { label: 'Worktrees', run: () => setShowWorktrees(true) },
               { label: 'Submodules', run: () => setShowSubmodules(true) },
               { label: 'Reflog / Undo', run: () => setShowReflog(true) },
+              { label: 'Bisect', run: () => setShowBisect(true) },
               { label: 'Command log', run: () => setShowCommandLog(true) },
               { label: 'Ignore rules', run: () => setShowExcludes(true) },
               { label: 'Trackers', run: () => setShowTrackers(true) },
