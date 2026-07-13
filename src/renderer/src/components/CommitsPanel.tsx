@@ -168,6 +168,8 @@ export default function CommitsPanel({
   const [allBranches, setAllBranches] = useState(true)
   const [grep, setGrep] = useState('')
   const [author, setAuthor] = useState('')
+  const [pickaxe, setPickaxe] = useState('')
+  const [pickaxeRegex, setPickaxeRegex] = useState(false)
   const [menu, setMenu] = useState<Menu | null>(null)
   const [busy, setBusy] = useState(false)
   const [copied, setCopied] = useState('')
@@ -207,7 +209,7 @@ export default function CommitsPanel({
 
   //Reload when the branch scope changes; search runs on submit.
   useEffect(() => {
-    load({ all: allBranches, grep, author, path, limit: 400 })
+    load({ all: allBranches, grep, author, path, pickaxe, pickaxeRegex, limit: 400 })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cwd, allBranches])
 
@@ -246,7 +248,7 @@ export default function CommitsPanel({
   const xOf = (col: number) => col * COL_W + COL_W / 2 + 5
   const yOf = (row: number) => row * ROW_H + ROW_H / 2
 
-  const submitSearch = () => load({ all: allBranches, grep, author, path, limit: 400 })
+  const submitSearch = () => load({ all: allBranches, grep, author, path, pickaxe, pickaxeRegex, limit: 400 })
 
   const copyHash = (hash: string) => {
     navigator.clipboard.writeText(hash).then(() => {
@@ -263,7 +265,7 @@ export default function CommitsPanel({
       await fn()
       toast('ok', okMsg)
       onChanged()
-      load({ all: allBranches, grep, author, path, limit: 400 })
+      load({ all: allBranches, grep, author, path, pickaxe, pickaxeRegex, limit: 400 })
       if (closeAfter) onClose?.()
     } catch (e: any) {
       toast('err', e?.message || String(e))
@@ -446,6 +448,26 @@ export default function CommitsPanel({
             placeholder="Author..."
             className="w-36 rounded-md border border-ink-700 bg-ink-950 px-2.5 py-1 text-sm outline-none focus:border-accent select-text"
           />
+          <input
+            value={pickaxe}
+            onChange={(e) => setPickaxe(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && submitSearch()}
+            placeholder={pickaxeRegex ? 'Code changed (regex)...' : 'Code changed...'}
+            title="Find commits that added or removed this text in their diff"
+            className="w-44 rounded-md border border-ink-700 bg-ink-950 px-2.5 py-1 text-sm outline-none focus:border-accent select-text"
+          />
+          <label
+            className="flex items-center gap-1 text-xs text-slate-400"
+            title="Match the code snippet as a regular expression (git log -G) instead of a literal string (-S)"
+          >
+            <input
+              type="checkbox"
+              checked={pickaxeRegex}
+              onChange={(e) => setPickaxeRegex(e.target.checked)}
+              className="accent-accent"
+            />
+            .*
+          </label>
           <button className="btn-soft text-xs" onClick={submitSearch}>
             Search
           </button>

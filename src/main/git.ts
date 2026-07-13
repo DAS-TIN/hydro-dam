@@ -848,6 +848,8 @@ export interface LogQuery {
   grep?: string // filter by commit message (case-insensitive)
   author?: string // filter by author name/email
   path?: string // limit to commits touching this path
+  pickaxe?: string // find commits whose diff adds or removes this text (git -S/-G)
+  pickaxeRegex?: boolean // treat pickaxe as a regex diff match (-G) instead of a literal string (-S)
 }
 
 /**
@@ -859,6 +861,7 @@ export async function logGraph(cwd: string, q: LogQuery = {}): Promise<GraphComm
   if (q.all) args.push('--all')
   if (q.grep && q.grep.trim()) args.push('-i', `--grep=${q.grep.trim()}`)
   if (q.author && q.author.trim()) args.push(`--author=${q.author.trim()}`)
+  if (q.pickaxe && q.pickaxe.trim()) args.push(q.pickaxeRegex ? `-G${q.pickaxe}` : `-S${q.pickaxe}`)
   if (q.path && q.path.trim()) args.push('--', q.path.trim())
   return parseGraphCommits(await git(cwd, args))
 }

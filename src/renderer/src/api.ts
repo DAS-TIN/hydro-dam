@@ -98,6 +98,8 @@ export interface LogQuery {
   grep?: string
   author?: string
   path?: string
+  pickaxe?: string
+  pickaxeRegex?: boolean
 }
 
 export interface BranchFull {
