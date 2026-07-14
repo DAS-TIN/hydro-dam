@@ -45,6 +45,10 @@ export interface Settings {
   uiZoom: number
   // Warn before pushing when outgoing commits contain key-shaped strings.
   secretScanOnPush: boolean
+  // Before committing, warn if the repo's identity isn't one of your saved profiles.
+  verifyAuthorOnCommit: boolean
+  // Push straight after every commit, no separate Push click.
+  autoPushOnCommit: boolean
 }
 
 // Reusable set of ignore patterns Hydrodam can seed into repositories. "private" goes
@@ -178,7 +182,9 @@ const defaultSettings: Settings = {
   aiModel: 'claude-opus-4-8',
   aiInstructions: '',
   uiZoom: 100,
-  secretScanOnPush: false
+  secretScanOnPush: false,
+  verifyAuthorOnCommit: false,
+  autoPushOnCommit: false
 }
 
 // Default private excludes for a fresh repo: local tool config that should stay

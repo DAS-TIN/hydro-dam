@@ -200,7 +200,9 @@ const DEFAULT_SETTINGS: Settings = {
   aiModel: 'claude-opus-4-8',
   aiInstructions: '',
   uiZoom: 100,
-  secretScanOnPush: false
+  secretScanOnPush: false,
+  verifyAuthorOnCommit: false,
+  autoPushOnCommit: false
 }
 
 function SplashScreen({ onDone }: { onDone: () => void }) {
@@ -558,6 +560,7 @@ export default function App() {
       toast('err', 'Write a commit message first.')
       return
     }
+    if (settings.verifyAuthorOnCommit && !(await authorLooksRight())) return
     const fresh = await api().integrity(cwd).catch(() => '')
     if (fresh && baselineSig.current && fresh !== baselineSig.current) {
       const freshStatus = await api().status(cwd).catch(() => null)
@@ -566,6 +569,26 @@ export default function App() {
       return
     }
     await doCommit(push)
+  }
+
+  // Double-check who this commit will be attributed to against your saved
+  // identity profiles. Returns false if the user backs out of an unknown author.
+  async function authorLooksRight(): Promise<boolean> {
+    if (!cwd) return true
+    const who = identity ?? (await api().identityGet(cwd).catch(() => null))
+    if (!who?.email) return true // no identity set: let git raise its own error
+    const { profiles } = await api().profilesList().catch(() => ({ profiles: [] }))
+    if (profiles.some((p) => p.email.toLowerCase() === who.email.toLowerCase())) return true
+    return confirmDialog({
+      title: 'Commit as this author?',
+      danger: true,
+      message: `This commit will be attributed to ${who.name || '(no name)'} <${who.email}>.`,
+      detail: profiles.length
+        ? "That email isn't one of your saved identity profiles. Commit as this author anyway?"
+        : 'You have no saved identity profiles to check against. Commit as this author anyway?',
+      confirmLabel: 'Commit anyway',
+      cancelLabel: 'Cancel'
+    })
   }
 
   async function doCommit(push = false) {
@@ -589,7 +612,7 @@ export default function App() {
     setMessage('')
     setAmend(false)
     setShowReview(false)
-    if (push) await pushWithGuard()
+    if (push || settings.autoPushOnCommit) await pushWithGuard()
     refresh()
   }
 
@@ -1755,6 +1778,22 @@ export default function App() {
               title="Review the commits you're about to push, with their co-authors"
             />
           )}
+          <button
+            onClick={() => updateSettings({ autoPushOnCommit: !settings.autoPushOnCommit })}
+            title={
+              settings.autoPushOnCommit
+                ? 'Auto-push is on: every commit is pushed straight away. Click to turn off.'
+                : 'Auto-push is off. Click to push automatically after each commit.'
+            }
+            className={`flex w-[52px] shrink-0 flex-col items-center gap-0.5 rounded-md border px-1 py-1 text-[10px] font-medium transition-colors ${
+              settings.autoPushOnCommit
+                ? 'border-accent bg-accent/15 text-accent'
+                : 'border-transparent text-slate-500 hover:bg-ink-800 hover:text-slate-300'
+            }`}
+          >
+            <IconArrowUp className="w-[18px] h-[18px]" />
+            <span className="leading-tight">{settings.autoPushOnCommit ? 'AUTO-PUSH ON' : 'Auto-push'}</span>
+          </button>
           <ToolBtn
             icon={<IconArrowUp className="w-[18px] h-[18px]" />}
             label="Push"

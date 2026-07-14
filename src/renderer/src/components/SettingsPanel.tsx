@@ -15,7 +15,9 @@ const ROWS: { key: keyof Settings; label: string; hint: string }[] = [
   { key: 'showLegend', label: 'Show colour key', hint: 'The legend of status colours under the file list.' },
   { key: 'treeView', label: 'Folder tree view', hint: 'Group changed files by folder instead of a flat list.' },
   { key: 'showOpStatus', label: 'Show last fetch / pull / push', hint: 'A status strip with the time of your last remote operations.' },
-  { key: 'showIgnored', label: 'Show ignored files', hint: 'List .gitignore-matched files in their own section.' }
+  { key: 'showIgnored', label: 'Show ignored files', hint: 'List .gitignore-matched files in their own section.' },
+  { key: 'verifyAuthorOnCommit', label: 'Verify author before committing', hint: "Warn when the commit identity isn't one of your saved profiles." },
+  { key: 'autoPushOnCommit', label: 'Auto-push after commit', hint: 'Push to the remote automatically each time you commit.' }
 ]
 
 export default function SettingsPanel({

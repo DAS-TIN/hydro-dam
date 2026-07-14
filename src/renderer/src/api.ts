@@ -410,6 +410,8 @@ export interface Settings {
   aiInstructions: string
   uiZoom: number
   secretScanOnPush: boolean
+  verifyAuthorOnCommit: boolean
+  autoPushOnCommit: boolean
 }
 
 export interface ExcludeProfile {
