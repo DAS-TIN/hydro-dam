@@ -212,6 +212,7 @@ export async function fileDiff(
   staged: boolean,
   untracked: boolean
 ): Promise<string> {
+  if (!path) return '' // empty pathspec is a fatal to git; nothing selected means nothing to diff
   if (untracked) {
     // git recognises the literal "/dev/null" on all platforms (incl. Git for Windows);
     // --no-index exits 1 when content differs, so we capture stdout regardless.
