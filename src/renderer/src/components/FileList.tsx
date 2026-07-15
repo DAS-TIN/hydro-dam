@@ -245,15 +245,26 @@ function Section({
   )
 }
 
-// The one-line "show tucked untracked (N)" entry point for hidden files.
-function RevealLink({ label, onClick }: { label: string; onClick: () => void }) {
+// One row of the bottom panel: "show tucked untracked (N)" when hidden, "hide
+// untracked (N)" once revealed. Clicking it flips the matching section open/shut.
+function RevealToggle({
+  revealed,
+  count,
+  noun,
+  onToggle
+}: {
+  revealed: boolean
+  count: number
+  noun: string
+  onToggle: () => void
+}) {
   return (
     <button
-      onClick={onClick}
+      onClick={onToggle}
       className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-[11px] text-slate-500 hover:bg-ink-850 hover:text-slate-300"
     >
-      <IconChevronRight className="w-3 h-3" />
-      {label}
+      {revealed ? <IconChevronDown className="w-3 h-3" /> : <IconChevronRight className="w-3 h-3" />}
+      {revealed ? `hide ${noun} (${count})` : `show tucked ${noun} (${count})`}
     </button>
   )
 }
@@ -419,7 +430,8 @@ export default function FileList(props: Props) {
   )
 
   return (
-    <div ref={boxRef} className="flex-1 overflow-auto">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div ref={boxRef} className="flex-1 overflow-auto">
       {tuckUntracked && (newUntracked.length > 0 || (showIgnored && newIgnored.length > 0)) && (
         <div className="flex items-center gap-2 border-b border-info/25 bg-info/10 px-3 py-1.5 text-[11px]">
           <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-info" />
@@ -527,13 +539,6 @@ export default function FileList(props: Props) {
         </Section>
       )}
 
-      {tuckUntracked && !revealUntracked && untracked.length > 0 && (
-        <RevealLink
-          label={`show tucked untracked (${untracked.length})`}
-          onClick={() => setRevealUntracked(true)}
-        />
-      )}
-
       <Section title="Hidden from commits" count={hidden.length} accent="bg-slate-500" collapsible>
         {hidden.map((p) => (
           <div
@@ -593,18 +598,33 @@ export default function FileList(props: Props) {
         </Section>
       )}
 
-      {showIgnored && tuckUntracked && !revealIgnored && ignored.length > 0 && (
-        <RevealLink
-          label={`show tucked ignored (${ignored.length})`}
-          onClick={() => setRevealIgnored(true)}
-        />
-      )}
-
       {status.clean && (
         <div className="flex flex-col items-center justify-center gap-1 py-16 text-center">
           <IconCheck className="w-8 h-8 text-good" />
           <div className="text-sm text-slate-400">Working tree clean</div>
           <div className="text-xs text-slate-600">Nothing to commit.</div>
+        </div>
+      )}
+      </div>
+
+      {tuckUntracked && (untracked.length > 0 || (showIgnored && ignored.length > 0)) && (
+        <div className="shrink-0 border-t border-ink-700/60 bg-ink-900/70">
+          {untracked.length > 0 && (
+            <RevealToggle
+              revealed={revealUntracked}
+              count={untracked.length}
+              noun="untracked"
+              onToggle={() => setRevealUntracked((v) => !v)}
+            />
+          )}
+          {showIgnored && ignored.length > 0 && (
+            <RevealToggle
+              revealed={revealIgnored}
+              count={ignored.length}
+              noun="ignored"
+              onToggle={() => setRevealIgnored((v) => !v)}
+            />
+          )}
         </div>
       )}
     </div>
