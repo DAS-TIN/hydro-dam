@@ -369,32 +369,41 @@ export default function App() {
   const refresh = useCallback(
     async (dir = cwd) => {
       if (!dir) return
-      try {
-        const [s, h, b, m, sig, o, ns, mi, su, si] = await Promise.all([
-          api().status(dir),
-          api().hidden(dir),
-          api().branches(dir),
-          api().repoMeta(dir),
-          api().integrity(dir).catch(() => ''),
-          api().opState(dir).catch(() => null),
-          api().numstat(dir).catch(() => null),
-          api().mcpStatus().catch(() => null),
-          api().seenUntracked(dir).catch(() => []),
-          api().seenIgnored(dir).catch(() => [])
-        ])
-        setStatus(s)
-        setNumstat(ns)
-        setHidden(h)
-        setSeenUntracked(su)
-        setSeenIgnored(si)
-        setBranches(b)
-        setRepoMeta(m)
-        setOp(o)
-        setMcp(mi)
-        if (sig) baselineSig.current = sig
-      } catch (e: any) {
-        toast('err', e?.message || String(e))
+      // Run each call on its own so one failure (or a missing api method from a
+      // stale preload build) can't throw and leave the app with no branch loaded.
+      const safe = async <T,>(fn: () => Promise<T> | T, fallback: T): Promise<T> => {
+        try {
+          return await fn()
+        } catch {
+          return fallback
+        }
       }
+      // Status is the critical read: load and set it first so the branch always
+      // shows, independent of whatever the auxiliary calls do.
+      const s = await safe(() => api().status(dir), null)
+      if (s) setStatus(s)
+      else toast('err', 'Could not read this repository. Try reopening the folder.')
+
+      const [h, b, m, sig, o, ns, mi, su, si] = await Promise.all([
+        safe(() => api().hidden(dir), [] as string[]),
+        safe(() => api().branches(dir), [] as Branch[]),
+        safe(() => api().repoMeta(dir), {} as RepoMeta),
+        safe(() => api().integrity(dir), ''),
+        safe(() => api().opState(dir), null),
+        safe(() => api().numstat(dir), null),
+        safe(() => api().mcpStatus(), null),
+        safe(() => api().seenUntracked(dir), [] as string[]),
+        safe(() => api().seenIgnored(dir), [] as string[])
+      ])
+      setNumstat(ns)
+      setHidden(h)
+      setSeenUntracked(su)
+      setSeenIgnored(si)
+      setBranches(b)
+      setRepoMeta(m)
+      setOp(o)
+      setMcp(mi)
+      if (sig) baselineSig.current = sig
     },
     [cwd, toast]
   )
