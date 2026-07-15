@@ -17,7 +17,8 @@ const ROWS: { key: keyof Settings; label: string; hint: string }[] = [
   { key: 'showOpStatus', label: 'Show last fetch / pull / push', hint: 'A status strip with the time of your last remote operations.' },
   { key: 'showIgnored', label: 'Show ignored files', hint: 'List .gitignore-matched files in their own section.' },
   { key: 'verifyAuthorOnCommit', label: 'Verify author before committing', hint: "Warn when the commit identity isn't one of your saved profiles." },
-  { key: 'autoPushOnCommit', label: 'Auto-push after commit', hint: 'Push to the remote automatically each time you commit.' }
+  { key: 'autoPushOnCommit', label: 'Auto-push after commit', hint: 'Push to the remote automatically each time you commit.' },
+  { key: 'tuckUntracked', label: 'Tuck away untracked files', hint: 'Collapse already-seen untracked files to the bottom; only newly appeared ones stay in view.' }
 ]
 
 export default function SettingsPanel({

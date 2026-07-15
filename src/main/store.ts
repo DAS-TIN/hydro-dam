@@ -49,6 +49,8 @@ export interface Settings {
   verifyAuthorOnCommit: boolean
   // Push straight after every commit, no separate Push click.
   autoPushOnCommit: boolean
+  // Collapse already-seen untracked files into a bottom section; keep new ones in view.
+  tuckUntracked: boolean
 }
 
 // Reusable set of ignore patterns Hydrodam can seed into repositories. "private" goes
@@ -123,6 +125,10 @@ interface Store {
   lastRepo: string | null
   settings: Settings
   repoMeta: Record<string, RepoMeta>
+  // Per-repo sets of untracked / ignored paths you've already seen, so only new
+  // ones get surfaced. Tucked-away files live here and stay tucked across restarts.
+  seenUntracked: Record<string, string[]>
+  seenIgnored: Record<string, string[]>
   profiles: IdentityProfile[]
   activeProfileId: string | null
   defaultExcludes: ExcludeProfile
@@ -184,7 +190,8 @@ const defaultSettings: Settings = {
   uiZoom: 100,
   secretScanOnPush: false,
   verifyAuthorOnCommit: false,
-  autoPushOnCommit: false
+  autoPushOnCommit: false,
+  tuckUntracked: true
 }
 
 // Default private excludes for a fresh repo: local tool config that should stay
@@ -200,6 +207,8 @@ const defaults: Store = {
   lastRepo: null,
   settings: { ...defaultSettings },
   repoMeta: {},
+  seenUntracked: {},
+  seenIgnored: {},
   profiles: [],
   activeProfileId: null,
   defaultExcludes: structuredClone(defaultExcludeProfile),
@@ -246,6 +255,8 @@ export function load(): Store {
       ...data,
       settings: { ...defaultSettings, ...(data.settings ?? {}) },
       repoMeta: data.repoMeta ?? {},
+      seenUntracked: data.seenUntracked ?? {},
+      seenIgnored: data.seenIgnored ?? {},
       profiles: data.profiles ?? [],
       activeProfileId: data.activeProfileId ?? null,
       defaultExcludes: {
@@ -339,6 +350,32 @@ export function recordOp(root: string, op: 'lastFetch' | 'lastPull' | 'lastPush'
 
 export function getRepoMeta(root: string): RepoMeta {
   return load().repoMeta[root] ?? {}
+}
+
+export function getSeenUntracked(root: string): string[] {
+  return load().seenUntracked[root] ?? []
+}
+
+export function getSeenIgnored(root: string): string[] {
+  return load().seenIgnored[root] ?? []
+}
+
+// Replace (not merge) the seen set with the paths still present now, so files
+// that got committed, staged or deleted drop out and it can't grow without bound.
+export function setSeenUntracked(root: string, paths: string[]): string[] {
+  const s = load()
+  const cleaned = [...new Set(paths.filter(Boolean))]
+  s.seenUntracked[root] = cleaned
+  save(s)
+  return cleaned
+}
+
+export function setSeenIgnored(root: string, paths: string[]): string[] {
+  const s = load()
+  const cleaned = [...new Set(paths.filter(Boolean))]
+  s.seenIgnored[root] = cleaned
+  save(s)
+  return cleaned
 }
 
 function randomId(): string {

@@ -412,6 +412,7 @@ export interface Settings {
   secretScanOnPush: boolean
   verifyAuthorOnCommit: boolean
   autoPushOnCommit: boolean
+  tuckUntracked: boolean
 }
 
 export interface ExcludeProfile {
@@ -620,6 +621,10 @@ export interface HydrodamApi {
   forgetRecentRepo(root: string): Promise<string[]>
   status(cwd: string): Promise<RepoStatus>
   hidden(cwd: string): Promise<string[]>
+  seenUntracked(cwd: string): Promise<string[]>
+  markUntrackedSeen(cwd: string, paths: string[]): Promise<string[]>
+  seenIgnored(cwd: string): Promise<string[]>
+  markIgnoredSeen(cwd: string, paths: string[]): Promise<string[]>
   branches(cwd: string): Promise<Branch[]>
   tree(cwd: string): Promise<string[]>
   numstat(cwd: string): Promise<WorkingNumstat>

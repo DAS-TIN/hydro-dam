@@ -6,10 +6,15 @@ interface Props {
   status: RepoStatus
   stats: WorkingNumstat | null
   hidden: string[]
+  seenUntracked: string[]
+  seenIgnored: string[]
+  tuckUntracked: boolean
   selected: string | null
   treeView: boolean
   showIgnored: boolean
   onSelect: (f: FileEntry, staged: boolean) => void
+  onMarkUntrackedSeen: (paths: string[]) => void
+  onMarkIgnoredSeen: (paths: string[]) => void
   onStage: (paths: string[]) => void
   onUnstage: (paths: string[]) => void
   onDiscard: (f: FileEntry) => void
@@ -190,6 +195,8 @@ function Section({
   accent,
   stat,
   action,
+  collapsible,
+  defaultCollapsed,
   children
 }: {
   title: string
@@ -197,33 +204,68 @@ function Section({
   accent?: string
   stat?: { add: number; del: number }
   action?: React.ReactNode
+  collapsible?: boolean
+  defaultCollapsed?: boolean
   children: React.ReactNode
 }) {
+  const [open, setOpen] = useState(!defaultCollapsed)
   if (count === 0) return null
+  const header = (
+    <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+      {collapsible && (
+        <span className="w-3 text-slate-600">
+          {open ? <IconChevronDown className="w-3 h-3" /> : <IconChevronRight className="w-3 h-3" />}
+        </span>
+      )}
+      <span className={`h-1.5 w-1.5 rounded-full ${accent ?? 'bg-slate-500'}`} />
+      {title}
+      <span className="text-slate-600">{count}</span>
+      {stat && (stat.add > 0 || stat.del > 0) && (
+        <span className="font-mono text-[10px] normal-case tracking-normal">
+          <span className="text-good/80">+{stat.add}</span>{' '}
+          <span className="text-bad/80">-{stat.del}</span>
+        </span>
+      )}
+    </span>
+  )
   return (
     <div className="mb-1">
       <div className="sticky top-0 z-10 flex items-center justify-between bg-ink-900/95 px-3 py-1.5 backdrop-blur">
-        <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-          <span className={`h-1.5 w-1.5 rounded-full ${accent ?? 'bg-slate-500'}`} />
-          {title}
-          <span className="text-slate-600">{count}</span>
-          {stat && (stat.add > 0 || stat.del > 0) && (
-            <span className="font-mono text-[10px] normal-case tracking-normal">
-              <span className="text-good/80">+{stat.add}</span>{' '}
-              <span className="text-bad/80">-{stat.del}</span>
-            </span>
-          )}
-        </span>
+        {collapsible ? (
+          <button className="flex items-center" onClick={() => setOpen((v) => !v)}>
+            {header}
+          </button>
+        ) : (
+          header
+        )}
         {action}
       </div>
-      {children}
+      {(!collapsible || open) && children}
     </div>
   )
 }
 
+// The one-line "show tucked untracked (N)" entry point for hidden files.
+function RevealLink({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-[11px] text-slate-500 hover:bg-ink-850 hover:text-slate-300"
+    >
+      <IconChevronRight className="w-3 h-3" />
+      {label}
+    </button>
+  )
+}
+
 export default function FileList(props: Props) {
-  const { status, stats, hidden, selected, treeView, showIgnored } = props
+  const { status, stats, hidden, selected, treeView, showIgnored, seenUntracked, seenIgnored, tuckUntracked } = props
   const tracked = status.files.filter((f) => !f.ignored)
+
+  // While tucking is on, untracked and ignored rows are hidden until you ask for
+  // them; the top strip is the only thing that flags newly-appeared ones.
+  const [revealUntracked, setRevealUntracked] = useState(false)
+  const [revealIgnored, setRevealIgnored] = useState(false)
 
   // Keep the row visible when selection moves by keyboard.
   const boxRef = useRef<HTMLDivElement>(null)
@@ -257,6 +299,13 @@ export default function FileList(props: Props) {
   const changed = tracked.filter((f) => f.unstaged && !f.conflicted)
   const untracked = tracked.filter((f) => f.untracked)
   const ignored = status.files.filter((f) => f.ignored)
+
+  // "New" = a path you haven't tucked away yet. The strip counts these; tucking
+  // moves them into the seen set so only the count of genuinely new files nags you.
+  const seenUntrackedSet = useMemo(() => new Set(seenUntracked), [seenUntracked])
+  const seenIgnoredSet = useMemo(() => new Set(seenIgnored), [seenIgnored])
+  const newUntracked = tuckUntracked ? untracked.filter((f) => !seenUntrackedSet.has(f.path)) : untracked
+  const newIgnored = tuckUntracked ? ignored.filter((f) => !seenIgnoredSet.has(f.path)) : ignored
 
   const SmallBtn = (p: { label: string; onClick: () => void; danger?: boolean; title?: string }) => (
     <button
@@ -371,7 +420,40 @@ export default function FileList(props: Props) {
 
   return (
     <div ref={boxRef} className="flex-1 overflow-auto">
-      <Section title="Conflicts" count={conflicts.length} accent="bg-bad">
+      {tuckUntracked && (newUntracked.length > 0 || (showIgnored && newIgnored.length > 0)) && (
+        <div className="flex items-center gap-2 border-b border-info/25 bg-info/10 px-3 py-1.5 text-[11px]">
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-info" />
+          <span className="min-w-0 flex-1 truncate text-slate-300">
+            {[
+              newUntracked.length > 0 && `${newUntracked.length} new untracked`,
+              showIgnored && newIgnored.length > 0 && `${newIgnored.length} new ignored`
+            ]
+              .filter(Boolean)
+              .join(', ')}
+          </span>
+          <button
+            className="rounded px-1.5 py-0.5 font-semibold text-accent hover:bg-accent/15"
+            onClick={() => {
+              if (newUntracked.length > 0) setRevealUntracked(true)
+              if (showIgnored && newIgnored.length > 0) setRevealIgnored(true)
+            }}
+          >
+            Show
+          </button>
+          <button
+            className="rounded px-1.5 py-0.5 font-semibold text-slate-400 hover:bg-ink-800 hover:text-slate-200"
+            title="Mark these as seen so they stop being flagged as new"
+            onClick={() => {
+              if (newUntracked.length > 0) props.onMarkUntrackedSeen(untracked.map((f) => f.path))
+              if (showIgnored && newIgnored.length > 0) props.onMarkIgnoredSeen(ignored.map((f) => f.path))
+            }}
+          >
+            Tuck away
+          </button>
+        </div>
+      )}
+
+      <Section title="Conflicts" count={conflicts.length} accent="bg-bad" collapsible>
         {body(conflicts, conflictLeaf)}
       </Section>
 
@@ -379,6 +461,7 @@ export default function FileList(props: Props) {
         title="Staged"
         count={staged.length}
         accent="bg-good"
+        collapsible
         stat={totals(staged, stagedStats)}
         action={
           staged.length > 0 ? (
@@ -397,6 +480,7 @@ export default function FileList(props: Props) {
         title="Changes"
         count={changed.length}
         accent="bg-warn"
+        collapsible
         stat={totals(changed, unstagedStats)}
         action={
           changed.length > 0 ? (
@@ -411,24 +495,46 @@ export default function FileList(props: Props) {
         {body(changed, changedLeaf)}
       </Section>
 
-      <Section
-        title="Untracked"
-        count={untracked.length}
-        accent="bg-info"
-        action={
-          untracked.length > 0 ? (
-            <SmallBtn
-              label="Stage all"
-              title="Start tracking & stage all new files for the next commit (git add)"
-              onClick={() => props.onStage(untracked.map((f) => f.path))}
-            />
-          ) : null
-        }
-      >
-        {body(untracked, untrackedLeaf)}
-      </Section>
+      {(!tuckUntracked || revealUntracked) && (
+        <Section
+          title="Untracked"
+          count={untracked.length}
+          accent="bg-info"
+          collapsible
+          action={
+            untracked.length > 0 ? (
+              <div className="flex items-center gap-1">
+                {tuckUntracked && (
+                  <SmallBtn
+                    label="Tuck away"
+                    title="Hide these and stop flagging them as new"
+                    onClick={() => {
+                      props.onMarkUntrackedSeen(untracked.map((f) => f.path))
+                      setRevealUntracked(false)
+                    }}
+                  />
+                )}
+                <SmallBtn
+                  label="Stage all"
+                  title="Start tracking & stage all new files for the next commit (git add)"
+                  onClick={() => props.onStage(untracked.map((f) => f.path))}
+                />
+              </div>
+            ) : null
+          }
+        >
+          {body(untracked, untrackedLeaf)}
+        </Section>
+      )}
 
-      <Section title="Hidden from commits" count={hidden.length} accent="bg-slate-500">
+      {tuckUntracked && !revealUntracked && untracked.length > 0 && (
+        <RevealLink
+          label={`show tucked untracked (${untracked.length})`}
+          onClick={() => setRevealUntracked(true)}
+        />
+      )}
+
+      <Section title="Hidden from commits" count={hidden.length} accent="bg-slate-500" collapsible>
         {hidden.map((p) => (
           <div
             key={'h' + p}
@@ -451,8 +557,25 @@ export default function FileList(props: Props) {
         ))}
       </Section>
 
-      {showIgnored && (
-        <Section title="Ignored" count={ignored.length} accent="bg-ink-600">
+      {showIgnored && (!tuckUntracked || revealIgnored) && (
+        <Section
+          title="Ignored"
+          count={ignored.length}
+          accent="bg-ink-600"
+          collapsible
+          action={
+            tuckUntracked && ignored.length > 0 ? (
+              <SmallBtn
+                label="Tuck away"
+                title="Hide these and stop flagging them as new"
+                onClick={() => {
+                  props.onMarkIgnoredSeen(ignored.map((f) => f.path))
+                  setRevealIgnored(false)
+                }}
+              />
+            ) : null
+          }
+        >
           {ignored.map((f) => (
             <div
               key={'i' + f.path}
@@ -468,6 +591,13 @@ export default function FileList(props: Props) {
             </div>
           ))}
         </Section>
+      )}
+
+      {showIgnored && tuckUntracked && !revealIgnored && ignored.length > 0 && (
+        <RevealLink
+          label={`show tucked ignored (${ignored.length})`}
+          onClick={() => setRevealIgnored(true)}
+        />
       )}
 
       {status.clean && (

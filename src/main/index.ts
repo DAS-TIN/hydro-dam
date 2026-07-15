@@ -506,6 +506,22 @@ handle('repo:forgetRecent', (root: string) => Store.forgetRepo(root))
 
 handle('repo:status', (cwd: string) => G.status(cwd))
 handle('repo:hidden', (cwd: string) => G.hiddenFiles(cwd))
+handle('untracked:seen', async (cwd: string) => {
+  const root = await G.repoRoot(cwd).catch(() => null)
+  return root ? Store.getSeenUntracked(root) : []
+})
+handle('untracked:markSeen', async (cwd: string, paths: string[]) => {
+  const root = await G.repoRoot(cwd).catch(() => null)
+  return root ? Store.setSeenUntracked(root, paths ?? []) : []
+})
+handle('ignored:seen', async (cwd: string) => {
+  const root = await G.repoRoot(cwd).catch(() => null)
+  return root ? Store.getSeenIgnored(root) : []
+})
+handle('ignored:markSeen', async (cwd: string, paths: string[]) => {
+  const root = await G.repoRoot(cwd).catch(() => null)
+  return root ? Store.setSeenIgnored(root, paths ?? []) : []
+})
 handle('repo:branches', (cwd: string) => G.branches(cwd))
 handle('repo:tree', (cwd: string) => G.listTree(cwd))
 handle('repo:numstat', (cwd: string) => G.workingNumstat(cwd))

@@ -202,7 +202,8 @@ const DEFAULT_SETTINGS: Settings = {
   uiZoom: 100,
   secretScanOnPush: false,
   verifyAuthorOnCommit: false,
-  autoPushOnCommit: false
+  autoPushOnCommit: false,
+  tuckUntracked: true
 }
 
 function SplashScreen({ onDone }: { onDone: () => void }) {
@@ -244,6 +245,8 @@ export default function App() {
   const [status, setStatus] = useState<RepoStatus | null>(null)
   const [numstat, setNumstat] = useState<WorkingNumstat | null>(null)
   const [hidden, setHidden] = useState<string[]>([])
+  const [seenUntracked, setSeenUntracked] = useState<string[]>([])
+  const [seenIgnored, setSeenIgnored] = useState<string[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
   const [coauthors, setCoauthors] = useState<Coauthor[]>([])
 
@@ -367,7 +370,7 @@ export default function App() {
     async (dir = cwd) => {
       if (!dir) return
       try {
-        const [s, h, b, m, sig, o, ns, mi] = await Promise.all([
+        const [s, h, b, m, sig, o, ns, mi, su, si] = await Promise.all([
           api().status(dir),
           api().hidden(dir),
           api().branches(dir),
@@ -375,11 +378,15 @@ export default function App() {
           api().integrity(dir).catch(() => ''),
           api().opState(dir).catch(() => null),
           api().numstat(dir).catch(() => null),
-          api().mcpStatus().catch(() => null)
+          api().mcpStatus().catch(() => null),
+          api().seenUntracked(dir).catch(() => []),
+          api().seenIgnored(dir).catch(() => [])
         ])
         setStatus(s)
         setNumstat(ns)
         setHidden(h)
+        setSeenUntracked(su)
+        setSeenIgnored(si)
         setBranches(b)
         setRepoMeta(m)
         setOp(o)
@@ -2028,10 +2035,19 @@ export default function App() {
                 status={status}
                 stats={numstat}
                 hidden={hidden}
+                seenUntracked={seenUntracked}
+                seenIgnored={seenIgnored}
+                tuckUntracked={settings.tuckUntracked}
                 selected={selKey}
                 treeView={settings.treeView}
                 showIgnored={settings.showIgnored}
                 onSelect={selectFile}
+                onMarkUntrackedSeen={(paths) =>
+                  run(() => A.markUntrackedSeen(cwd, paths).then((s) => setSeenUntracked(s)), 'Untracked files tucked away.')
+                }
+                onMarkIgnoredSeen={(paths) =>
+                  run(() => A.markIgnoredSeen(cwd, paths).then((s) => setSeenIgnored(s)), 'Ignored files tucked away.')
+                }
                 onStage={stagePaths}
                 onUnstage={unstagePaths}
                 onDiscard={discardFile}
