@@ -1958,40 +1958,49 @@ export default function App() {
             <nav
               ref={railRef}
               data-region="rail"
-              className={`flex shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-ink-800 bg-ink-900 p-1.5 ${
-                expanded ? 'w-44' : 'w-12 items-center'
+              className={`flex shrink-0 flex-col border-r border-ink-800 bg-ink-900 ${
+                expanded ? 'w-44' : 'w-12'
               }`}
             >
-              <button
-                onClick={() => updateSettings({ navLabels: !expanded })}
-                title={expanded ? 'Collapse sidebar' : 'Expand sidebar'}
-                className={`mb-1 flex h-7 shrink-0 items-center justify-center gap-2 rounded-md bg-accent/15 text-accent hover:bg-accent/25 ${
-                  expanded ? 'w-full' : 'w-9'
+              {/* Fixed header outside the scroll area, so nothing shows behind it. */}
+              <div className={`shrink-0 p-1.5 pb-1 ${expanded ? '' : 'flex justify-center'}`}>
+                <button
+                  onClick={() => updateSettings({ navLabels: !expanded })}
+                  title={expanded ? 'Collapse sidebar' : 'Expand sidebar'}
+                  className={`flex h-7 shrink-0 items-center justify-center gap-2 rounded-md bg-accent/15 text-accent hover:bg-accent/25 ${
+                    expanded ? 'w-full' : 'w-9'
+                  }`}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    {expanded ? <path d="M15.2 5.8L9 12l6.2 6.2"/> : <path d="M8.8 5.8L15 12l-6.2 6.2"/>}
+                  </svg>
+                  {expanded && <span className="text-[11px] font-medium">Collapse</span>}
+                </button>
+              </div>
+              <div
+                className={`flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-1.5 pb-1.5 ${
+                  expanded ? '' : 'items-center'
                 }`}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  {expanded ? <path d="M15.2 5.8L9 12l6.2 6.2"/> : <path d="M8.8 5.8L15 12l-6.2 6.2"/>}
-                </svg>
-                {expanded && <span className="text-[11px] font-medium">Collapse</span>}
-              </button>
-              {railMain.map((i) => navBtn(i.key, i.label, i.icon, i.run, i.active, i.badge))}
-              {divider('d1')}
-              {railTools.map((i) => navBtn(i.key, i.label, i.icon, i.run))}
-              {divider('d2')}
-              {/* the More rows render inline so the rail only grows downwards */}
-              {navBtn(
-                'more',
-                'More',
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                  <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
-                </svg>,
-                () => setMoreMenu((v) => !v),
-                moreMenu
-              )}
-              {moreMenu && railMore.map((i) => navBtn(i.key, i.label, i.icon, i.run))}
-              <div className={`mt-auto flex shrink-0 flex-col gap-0.5 ${expanded ? 'w-full' : 'items-center'}`}>
-                {navBtn('help', 'Help', <IconHelp className="w-[18px] h-[18px]" />, () => setShowHelp(true))}
-                {navBtn('settings', 'Settings', <IconGear className="w-[18px] h-[18px]" />, () => setShowSettings(true))}
+                {railMain.map((i) => navBtn(i.key, i.label, i.icon, i.run, i.active, i.badge))}
+                {divider('d1')}
+                {railTools.map((i) => navBtn(i.key, i.label, i.icon, i.run))}
+                {divider('d2')}
+                {/* the More rows render inline so the rail only grows downwards */}
+                {navBtn(
+                  'more',
+                  'More',
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
+                  </svg>,
+                  () => setMoreMenu((v) => !v),
+                  moreMenu
+                )}
+                {moreMenu && railMore.map((i) => navBtn(i.key, i.label, i.icon, i.run))}
+                <div className={`mt-auto flex shrink-0 flex-col gap-0.5 ${expanded ? 'w-full' : 'items-center'}`}>
+                  {navBtn('help', 'Help', <IconHelp className="w-[18px] h-[18px]" />, () => setShowHelp(true))}
+                  {navBtn('settings', 'Settings', <IconGear className="w-[18px] h-[18px]" />, () => setShowSettings(true))}
+                </div>
               </div>
             </nav>
             <FocusHalo on={kbNav && focusRegion === 'rail'} />
