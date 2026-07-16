@@ -2004,7 +2004,7 @@ export default function App() {
           ref={filesRef}
           data-region="files"
           tabIndex={-1}
-          className="relative flex shrink-0 flex-col outline-none"
+          className="relative flex min-h-0 shrink-0 flex-col outline-none"
           style={{ width: leftW }}
         >
           <FocusHalo on={kbNav && focusRegion === 'files'} />
