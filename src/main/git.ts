@@ -936,6 +936,35 @@ export async function resetTo(cwd: string, hash: string, mode: 'soft' | 'mixed' 
   await git(cwd, ['reset', `--${mode}`, hash])
 }
 
+export interface ResetPreview {
+  mode: 'soft' | 'mixed' | 'hard'
+  // Commits on the current branch that the reset moves past (target..HEAD). A soft
+  // or mixed reset keeps their changes; a hard reset drops them from the branch.
+  droppedCommits: { shortHash: string; subject: string }[]
+  // Tracked working-tree changes a hard reset throws away (diff against HEAD).
+  discardedFiles: NumstatEntry[]
+}
+
+// What a reset to `target` would move past or throw away, so the user sees the
+// cost before confirming. Untracked files survive a reset, so they're not listed.
+export async function resetPreview(
+  cwd: string,
+  target: string,
+  mode: 'soft' | 'mixed' | 'hard'
+): Promise<ResetPreview> {
+  const raw = await git(cwd, ['log', '--pretty=format:%h\x1f%s', `${target}..HEAD`]).catch(() => '')
+  const droppedCommits = raw
+    .split('\n')
+    .filter(Boolean)
+    .map((l) => {
+      const [shortHash, subject] = l.split('\x1f')
+      return { shortHash, subject }
+    })
+  const discardedFiles =
+    mode === 'hard' ? parseNumstat(await git(cwd, ['diff', 'HEAD', '--numstat']).catch(() => '')) : []
+  return { mode, droppedCommits, discardedFiles }
+}
+
 export async function checkoutDetached(cwd: string, hash: string): Promise<void> {
   await git(cwd, ['checkout', hash])
 }

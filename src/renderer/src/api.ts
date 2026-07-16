@@ -35,6 +35,12 @@ export interface WorkingNumstat {
   unstaged: NumstatEntry[]
 }
 
+export interface ResetPreview {
+  mode: 'soft' | 'mixed' | 'hard'
+  droppedCommits: { shortHash: string; subject: string }[]
+  discardedFiles: NumstatEntry[]
+}
+
 export interface Commit {
   hash: string
   shortHash: string
@@ -656,6 +662,7 @@ export interface HydrodamApi {
   cherryPick(cwd: string, hash: string): Promise<string>
   revertCommit(cwd: string, hash: string): Promise<string>
   resetTo(cwd: string, hash: string, mode: 'soft' | 'mixed' | 'hard'): Promise<void>
+  resetPreview(cwd: string, hash: string, mode: 'soft' | 'mixed' | 'hard'): Promise<ResetPreview>
   checkoutCommit(cwd: string, hash: string): Promise<void>
   branchAt(cwd: string, name: string, ref: string): Promise<void>
   tagAt(cwd: string, name: string, ref: string): Promise<void>

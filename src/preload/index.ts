@@ -74,6 +74,8 @@ const api = {
   revertCommit: (cwd: string, hash: string) => call<string>('commit:revert', cwd, hash),
   resetTo: (cwd: string, hash: string, mode: 'soft' | 'mixed' | 'hard') =>
     call<void>('commit:reset', cwd, hash, mode),
+  resetPreview: (cwd: string, hash: string, mode: 'soft' | 'mixed' | 'hard') =>
+    call<any>('commit:resetPreview', cwd, hash, mode),
   checkoutCommit: (cwd: string, hash: string) => call<void>('commit:checkout', cwd, hash),
   branchAt: (cwd: string, name: string, ref: string) => call<void>('commit:branchAt', cwd, name, ref),
   tagAt: (cwd: string, name: string, ref: string) => call<void>('commit:tagAt', cwd, name, ref),

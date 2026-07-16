@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { IconClose } from './Icons'
-import { api, confirmDialog, GraphCommit, LogQuery, basename } from '../api'
+import { api, confirmDialog, GraphCommit, LogQuery, ResetPreview, basename } from '../api'
 import DiffView from './DiffView'
 import { promptDialog } from './PromptModal'
+import LossPreviewModal from './LossPreviewModal'
 
 const ROW_H = 50 // px; must match the row height below so the graph aligns
 const COL_W = 14 // px per graph lane
@@ -173,6 +174,7 @@ export default function CommitsPanel({
   const [menu, setMenu] = useState<Menu | null>(null)
   const [busy, setBusy] = useState(false)
   const [copied, setCopied] = useState('')
+  const [lossModal, setLossModal] = useState<{ preview: ResetPreview; target: string; hash: string } | null>(null)
   const [dragBranch, setDragBranch] = useState<{ name: string; current: boolean } | null>(null)
   const [dragCommit, setDragCommit] = useState<{ hash: string; shortHash: string } | null>(null)
   const [branchDrop, setBranchDrop] = useState<{ source: string; target: string; x: number; y: number } | null>(null)
@@ -389,16 +391,22 @@ export default function CommitsPanel({
     {
       label: 'Reset to here (hard) - discards changes',
       danger: true,
-      run: () =>
-        confirmDialog({
-          title: 'Hard reset',
-          danger: true,
-          message: `Hard reset ${currentBranch || 'branch'} to ${c.shortHash}?`,
-          detail: 'All uncommitted changes AND commits after this one are discarded. This cannot be undone.',
-          confirmLabel: 'Hard reset'
-        }).then((ok) => {
-          if (ok) act(() => api().resetTo(cwd, c.hash, 'hard'), `Hard reset to ${c.shortHash}.`)
-        })
+      run: async () => {
+        const preview = await api()
+          .resetPreview(cwd, c.hash, 'hard')
+          .catch(() => null)
+        if (preview) setLossModal({ preview, target: c.shortHash, hash: c.hash })
+        else
+          confirmDialog({
+            title: 'Hard reset',
+            danger: true,
+            message: `Hard reset ${currentBranch || 'branch'} to ${c.shortHash}?`,
+            detail: 'All uncommitted changes AND commits after this one are discarded.',
+            confirmLabel: 'Hard reset'
+          }).then((ok) => {
+            if (ok) act(() => api().resetTo(cwd, c.hash, 'hard'), `Hard reset to ${c.shortHash}.`)
+          })
+      }
     }
   ]
 
@@ -791,6 +799,21 @@ export default function CommitsPanel({
             Rebase {branchDrop.target} onto {branchDrop.source}
           </button>
         </div>
+      )}
+
+      {lossModal && (
+        <LossPreviewModal
+          target={lossModal.target}
+          branch={currentBranch || 'branch'}
+          preview={lossModal.preview}
+          busy={busy}
+          onCancel={() => setLossModal(null)}
+          onConfirm={() => {
+            const { hash, target } = lossModal
+            setLossModal(null)
+            act(() => api().resetTo(cwd, hash, 'hard'), `Hard reset to ${target}.`)
+          }}
+        />
       )}
     </div>
   )

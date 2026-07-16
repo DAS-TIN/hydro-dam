@@ -606,6 +606,9 @@ handle('commit:revert', (cwd: string, hash: string) => G.revertCommit(cwd, hash)
 handle('commit:reset', (cwd: string, hash: string, mode: 'soft' | 'mixed' | 'hard') =>
   G.resetTo(cwd, hash, mode)
 )
+handle('commit:resetPreview', (cwd: string, hash: string, mode: 'soft' | 'mixed' | 'hard') =>
+  G.resetPreview(cwd, hash, mode)
+)
 handle('commit:checkout', (cwd: string, hash: string) => G.checkoutDetached(cwd, hash))
 handle('commit:branchAt', (cwd: string, name: string, ref: string) => G.createBranchAt(cwd, name, ref))
 handle('commit:tagAt', (cwd: string, name: string, ref: string) => G.tagAt(cwd, name, ref))
