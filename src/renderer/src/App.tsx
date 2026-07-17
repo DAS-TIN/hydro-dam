@@ -787,7 +787,10 @@ export default function App() {
   const stagedCount = status?.files.filter((f) => f.staged && !f.conflicted).length ?? 0
   const conflictCount = status?.files.filter((f) => f.conflicted).length ?? 0
   const activeCo = coauthors.filter((c) => c.enabled)
-  const aiAvailable = !!settings.anthropicApiKey.trim()
+  const aiAvailable = !!(
+    settings.aiApiKey.trim() ||
+    (settings.aiProvider === 'anthropic' && settings.anthropicApiKey.trim())
+  )
 
   // Offer the resolver (and AI) the moment conflicts first appear.
   useEffect(() => {

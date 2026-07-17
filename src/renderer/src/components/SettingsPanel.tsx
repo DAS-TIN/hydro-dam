@@ -9,6 +9,15 @@ const AI_MODELS: { id: string; label: string; hint: string }[] = [
   { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5', hint: 'fastest, cheapest' }
 ]
 
+type Provider = Settings['aiProvider']
+const PROVIDERS: { id: Provider; label: string; endpoint: string; keyHint: string; modelHint: string }[] = [
+  { id: 'anthropic', label: 'Anthropic (Claude)', endpoint: '', keyHint: 'sk-ant-...', modelHint: '' },
+  { id: 'openai', label: 'OpenAI', endpoint: 'https://api.openai.com/v1', keyHint: 'sk-...', modelHint: 'gpt-4o' },
+  { id: 'openrouter', label: 'OpenRouter', endpoint: 'https://openrouter.ai/api/v1', keyHint: 'sk-or-...', modelHint: 'anthropic/claude-sonnet-4' },
+  { id: 'xai', label: 'xAI (Grok)', endpoint: 'https://api.x.ai/v1', keyHint: 'xai-...', modelHint: 'grok-4' },
+  { id: 'custom', label: 'Custom (OpenAI-compatible)', endpoint: '', keyHint: 'your key', modelHint: 'model id' }
+]
+
 const ZOOMS = [90, 100, 110, 125, 140]
 
 const ROWS: { key: keyof Settings; label: string; hint: string }[] = [
@@ -39,10 +48,19 @@ export default function SettingsPanel({
   const [mcp, setMcp] = useState<McpInfo | null>(null)
   const [port, setPort] = useState(String(settings.mcpPort))
   const [copied, setCopied] = useState(false)
-  const [apiKey, setApiKey] = useState(settings.anthropicApiKey)
+  // The active provider's key: aiApiKey, falling back to the legacy anthropicApiKey.
+  const activeKey = settings.aiApiKey || (settings.aiProvider === 'anthropic' ? settings.anthropicApiKey : '')
+  const [apiKey, setApiKey] = useState(activeKey)
   const [showKey, setShowKey] = useState(false)
+  const [baseUrl, setBaseUrl] = useState(settings.aiBaseUrl)
+  const [modelText, setModelText] = useState(settings.aiModel)
   const [aiNotes, setAiNotes] = useState(settings.aiInstructions)
   useEffect(() => setAiNotes(settings.aiInstructions), [settings.aiInstructions])
+  useEffect(() => setApiKey(activeKey), [activeKey])
+  useEffect(() => setBaseUrl(settings.aiBaseUrl), [settings.aiBaseUrl])
+  useEffect(() => setModelText(settings.aiModel), [settings.aiModel])
+  const saveKey = () => onChange({ aiApiKey: apiKey.trim() })
+  const pinfo = PROVIDERS.find((p) => p.id === settings.aiProvider) ?? PROVIDERS[0]
 
   useEffect(() => {
     const tick = () => api().mcpStatus().then(setMcp).catch(() => {})
@@ -52,7 +70,6 @@ export default function SettingsPanel({
   }, [])
 
   useEffect(() => setPort(String(settings.mcpPort)), [settings.mcpPort])
-  useEffect(() => setApiKey(settings.anthropicApiKey), [settings.anthropicApiKey])
 
   const applyPort = () => {
     const n = parseInt(port, 10)
@@ -179,26 +196,58 @@ export default function SettingsPanel({
               </span>
             </div>
             <p className="mb-3 text-xs text-slate-500">
-              Optional. With an Anthropic API key, Hydrodam can draft commit messages, review and
-              explain changes, group files into commits, and propose conflict resolutions - always
-              shown for your review before anything is saved. Everything else works without this.
+              Optional. With an API key, Hydrodam can draft commit messages, review and explain
+              changes, group files into commits, and propose conflict resolutions - always shown for
+              your review before anything is saved. Everything else works without this.
             </p>
-            <div className="flex gap-2">
+
+            <div className="flex items-center justify-between py-1">
+              <div className="text-sm text-slate-200">Provider</div>
+              <select
+                value={settings.aiProvider}
+                onChange={(e) => onChange({ aiProvider: e.target.value as Provider })}
+                className="rounded-md border border-ink-700 bg-ink-950 px-2 py-1.5 text-sm outline-none focus:border-accent"
+              >
+                {PROVIDERS.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {settings.aiProvider === 'custom' ? (
+              <div className="mt-2">
+                <div className="text-sm text-slate-200">Endpoint</div>
+                <input
+                  value={baseUrl}
+                  onChange={(e) => setBaseUrl(e.target.value)}
+                  onBlur={() => baseUrl !== settings.aiBaseUrl && onChange({ aiBaseUrl: baseUrl.trim() })}
+                  placeholder="https://host/v1"
+                  className="mt-1 w-full rounded-md border border-ink-700 bg-ink-950 px-3 py-1.5 font-mono text-sm outline-none focus:border-accent"
+                />
+              </div>
+            ) : (
+              pinfo.endpoint && (
+                <div className="mt-1 text-[11px] text-slate-600">
+                  Endpoint: <code className="text-slate-400">{pinfo.endpoint}</code>
+                </div>
+              )
+            )}
+
+            <div className="mt-2 flex gap-2">
               <input
                 type={showKey ? 'text' : 'password'}
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
-                onBlur={() => apiKey !== settings.anthropicApiKey && onChange({ anthropicApiKey: apiKey.trim() })}
-                placeholder="sk-ant-..."
+                onBlur={() => apiKey.trim() !== activeKey && saveKey()}
+                placeholder={pinfo.keyHint}
                 className="flex-1 rounded-md border border-ink-700 bg-ink-950 px-3 py-1.5 font-mono text-sm outline-none focus:border-accent"
               />
               <button className="btn-ghost text-xs" onClick={() => setShowKey((v) => !v)}>
                 {showKey ? 'hide' : 'show'}
               </button>
-              <button
-                className="btn-soft text-xs"
-                onClick={() => onChange({ anthropicApiKey: apiKey.trim() })}
-              >
+              <button className="btn-soft text-xs" onClick={saveKey}>
                 Save
               </button>
             </div>
@@ -213,17 +262,27 @@ export default function SettingsPanel({
                   Used for commit drafts, reviews, explanations, and conflict resolutions.
                 </div>
               </div>
-              <select
-                value={settings.aiModel}
-                onChange={(e) => onChange({ aiModel: e.target.value })}
-                className="rounded-md border border-ink-700 bg-ink-950 px-2 py-1.5 text-sm outline-none focus:border-accent"
-              >
-                {AI_MODELS.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.label} - {m.hint}
-                  </option>
-                ))}
-              </select>
+              {settings.aiProvider === 'anthropic' ? (
+                <select
+                  value={settings.aiModel}
+                  onChange={(e) => onChange({ aiModel: e.target.value })}
+                  className="rounded-md border border-ink-700 bg-ink-950 px-2 py-1.5 text-sm outline-none focus:border-accent"
+                >
+                  {AI_MODELS.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label} - {m.hint}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  value={modelText}
+                  onChange={(e) => setModelText(e.target.value)}
+                  onBlur={() => modelText !== settings.aiModel && onChange({ aiModel: modelText.trim() })}
+                  placeholder={pinfo.modelHint}
+                  className="w-48 rounded-md border border-ink-700 bg-ink-950 px-2 py-1.5 font-mono text-sm outline-none focus:border-accent"
+                />
+              )}
             </div>
 
             <div className="mt-2">
