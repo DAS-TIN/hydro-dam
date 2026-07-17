@@ -405,6 +405,9 @@ export interface Settings {
   mcpPort: number
   mcpDangerous: boolean
   anthropicApiKey: string
+  aiProvider: 'anthropic' | 'openai' | 'openrouter' | 'xai' | 'custom'
+  aiBaseUrl: string
+  aiApiKey: string
   autoSeedExcludes: boolean
   githubToken: string
   gitlabToken: string

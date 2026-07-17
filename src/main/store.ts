@@ -25,6 +25,13 @@ export interface Settings {
   mcpPort: number
   mcpDangerous: boolean
   anthropicApiKey: string
+  // Which AI backend to talk to. openai/openrouter/xai all speak the OpenAI chat format;
+  // custom lets you point aiBaseUrl at any OpenAI-compatible endpoint.
+  aiProvider: 'anthropic' | 'openai' | 'openrouter' | 'xai' | 'custom'
+  // Endpoint override, only used when aiProvider is 'custom'.
+  aiBaseUrl: string
+  // Key for the active provider (anthropic still falls back to anthropicApiKey).
+  aiApiKey: string
   // When true, the default ignore profile is applied to repos created or cloned in Hydrodam.
   autoSeedExcludes: boolean
   // Personal access tokens for the GitHub / GitLab integration (optional).
@@ -178,6 +185,9 @@ const defaultSettings: Settings = {
   mcpPort: 4319,
   mcpDangerous: false,
   anthropicApiKey: '',
+  aiProvider: 'anthropic',
+  aiBaseUrl: '',
+  aiApiKey: '',
   autoSeedExcludes: true,
   githubToken: '',
   gitlabToken: '',

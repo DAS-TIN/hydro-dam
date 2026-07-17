@@ -13,36 +13,62 @@ import {
 import { spawn } from 'node:child_process'
 import { randomUUID, createHash } from 'node:crypto'
 import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 import * as G from './git'
 import * as Store from './store'
 import * as Mcp from './mcp'
 import * as Templates from './templates'
 import * as Remote from './remote'
 
-// Shared AI call: one system prompt + one user message, text out. Model and
-// extra instructions come from Settings; key required.
+// Base endpoints for the OpenAI-compatible providers. 'custom' reads aiBaseUrl.
+const OPENAI_BASE: Record<string, string | undefined> = {
+  openai: undefined, // SDK default
+  openrouter: 'https://openrouter.ai/api/v1',
+  xai: 'https://api.x.ai/v1'
+}
+
+// Shared AI call: one system prompt + one user message, text out. The provider,
+// model, key and extra instructions all come from Settings.
 async function aiText(system: string, user: string, maxTokens = 4000): Promise<string> {
   const s = Store.getSettings()
-  const key = s.anthropicApiKey?.trim()
-  if (!key) throw new Error('No API key set. Add one in Settings > AI assist.')
-  const client = new Anthropic({ apiKey: key })
-  const model = s.aiModel?.trim() || 'claude-opus-4-8'
+  const provider = s.aiProvider || 'anthropic'
   const extra = s.aiInstructions?.trim()
   const fullSystem = extra ? `${system}\n\nAdditional instructions from the user:\n${extra}` : system
-  const req: Anthropic.MessageCreateParamsNonStreaming = {
+
+  if (provider === 'anthropic') {
+    const key = s.aiApiKey?.trim() || s.anthropicApiKey?.trim()
+    if (!key) throw new Error('No API key set. Add one in Settings > AI assist.')
+    const model = s.aiModel?.trim() || 'claude-opus-4-8'
+    const req: Anthropic.MessageCreateParamsNonStreaming = {
+      model,
+      max_tokens: maxTokens,
+      system: fullSystem,
+      messages: [{ role: 'user', content: user }]
+    }
+    // Haiku does not support adaptive thinking; the Opus/Sonnet options do.
+    if (!model.includes('haiku')) req.thinking = { type: 'adaptive' }
+    const res = await new Anthropic({ apiKey: key }).messages.create(req)
+    return res.content
+      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+      .map((b) => b.text)
+      .join('')
+      .trim()
+  }
+
+  const key = s.aiApiKey?.trim()
+  if (!key) throw new Error(`No API key set for ${provider}. Add one in Settings > AI assist.`)
+  const model = s.aiModel?.trim()
+  if (!model) throw new Error(`Set a model for ${provider} in Settings > AI assist.`)
+  const baseURL = provider === 'custom' ? s.aiBaseUrl?.trim() || undefined : OPENAI_BASE[provider]
+  const res = await new OpenAI({ apiKey: key, baseURL }).chat.completions.create({
     model,
     max_tokens: maxTokens,
-    system: fullSystem,
-    messages: [{ role: 'user', content: user }]
-  }
-  // Haiku does not support adaptive thinking; the Opus/Sonnet options do.
-  if (!model.includes('haiku')) req.thinking = { type: 'adaptive' }
-  const res = await client.messages.create(req)
-  return res.content
-    .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-    .map((b) => b.text)
-    .join('')
-    .trim()
+    messages: [
+      { role: 'system', content: fullSystem },
+      { role: 'user', content: user }
+    ]
+  })
+  return (res.choices[0]?.message?.content || '').trim()
 }
 
 function stripFences(t: string): string {
