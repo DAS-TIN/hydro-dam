@@ -822,6 +822,35 @@ export interface HydrodamApi {
       action: 'new-repo' | 'open-repo' | 'settings' | 'stash' | 'commit' | 'push' | 'pull' | 'fetch'
     ) => void
   ): () => void
+  lspOpen(cwd: string, path: string, text: string): Promise<LspStatus>
+  lspChange(cwd: string, path: string, text: string): Promise<void>
+  lspClose(cwd: string, path: string): Promise<void>
+  lspStatus(cwd: string, path: string): Promise<LspStatus>
+  onLspDiagnostics(cb: (p: LspDiagnosticsEvent) => void): () => void
+}
+
+export interface LspStatus {
+  status: 'starting' | 'running' | 'not-found' | 'error' | 'unsupported'
+  command?: string
+  error?: string
+}
+
+export interface LspRange {
+  start: { line: number; character: number }
+  end: { line: number; character: number }
+}
+
+export interface LspDiagnostic {
+  range: LspRange
+  severity?: number // 1 error, 2 warning, 3 info, 4 hint
+  message: string
+  source?: string
+}
+
+export interface LspDiagnosticsEvent {
+  cwd: string
+  path: string
+  diagnostics: LspDiagnostic[]
 }
 
 declare global {

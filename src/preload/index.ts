@@ -291,6 +291,16 @@ const api = {
     return () => ipcRenderer.removeListener('git:command', listener)
   },
 
+  lspOpen: (cwd: string, path: string, text: string) => call<any>('lsp:open', cwd, path, text),
+  lspChange: (cwd: string, path: string, text: string) => call<void>('lsp:change', cwd, path, text),
+  lspClose: (cwd: string, path: string) => call<void>('lsp:close', cwd, path),
+  lspStatus: (cwd: string, path: string) => call<any>('lsp:status', cwd, path),
+  onLspDiagnostics: (cb: (p: { cwd: string; path: string; diagnostics: any[] }) => void) => {
+    const listener = (_e: unknown, p: any) => cb(p)
+    ipcRenderer.on('lsp:diagnostics', listener)
+    return () => ipcRenderer.removeListener('lsp:diagnostics', listener)
+  },
+
   // menu-driven actions from the native application menu
   onMenu: (
     cb: (

@@ -17,6 +17,7 @@ import OpenAI from 'openai'
 import * as G from './git'
 import * as Store from './store'
 import * as Mcp from './mcp'
+import * as Lsp from './lsp'
 import * as Templates from './templates'
 import * as Remote from './remote'
 
@@ -389,6 +390,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   Mcp.stopMcp()
+  Lsp.disposeAll()
 })
 
 // Wrap a handler so renderer always gets { ok, data } | { ok:false, error }
@@ -529,6 +531,11 @@ handle('repo:recent', () => {
   return { recent: s.recentRepos, last: s.lastRepo }
 })
 handle('repo:forgetRecent', (root: string) => Store.forgetRepo(root))
+
+handle('lsp:open', (cwd: string, path: string, text: string) => Lsp.openDoc(cwd, path, text))
+handle('lsp:change', (cwd: string, path: string, text: string) => Lsp.changeDoc(cwd, path, text))
+handle('lsp:close', (cwd: string, path: string) => Lsp.closeDoc(cwd, path))
+handle('lsp:status', (cwd: string, path: string) => Lsp.statusFor(cwd, path))
 
 handle('repo:status', (cwd: string) => G.status(cwd))
 handle('repo:hidden', (cwd: string) => G.hiddenFiles(cwd))
