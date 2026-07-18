@@ -213,6 +213,10 @@ class Server {
     this.notify('textDocument/didClose', { textDocument: { uri } })
   }
 
+  ask(method: string, params: unknown): Promise<any> {
+    return this.request(method, params)
+  }
+
   dispose(): void {
     try {
       this.proc?.kill()
@@ -266,6 +270,28 @@ export async function changeDoc(cwd: string, path: string, text: string): Promis
 export async function closeDoc(cwd: string, path: string): Promise<void> {
   const r = await resolve(cwd, path)
   if (r.server) r.server.didClose(r.uri)
+}
+
+// One request at a document position (hover / definition / completion). Returns
+// null when the file's language has no server or the server isn't ready.
+async function posRequest(cwd: string, path: string, method: string, line: number, character: number): Promise<any> {
+  const r = await resolve(cwd, path)
+  if (!r.server) return null
+  return r.server
+    .ask(method, { textDocument: { uri: r.uri }, position: { line, character } })
+    .catch(() => null)
+}
+
+export function hover(cwd: string, path: string, line: number, character: number): Promise<any> {
+  return posRequest(cwd, path, 'textDocument/hover', line, character)
+}
+
+export function definition(cwd: string, path: string, line: number, character: number): Promise<any> {
+  return posRequest(cwd, path, 'textDocument/definition', line, character)
+}
+
+export function completion(cwd: string, path: string, line: number, character: number): Promise<any> {
+  return posRequest(cwd, path, 'textDocument/completion', line, character)
 }
 
 export async function statusFor(cwd: string, path: string): Promise<{ status: Status | 'unsupported'; command?: string; error?: string }> {

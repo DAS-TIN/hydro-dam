@@ -536,6 +536,9 @@ handle('lsp:open', (cwd: string, path: string, text: string) => Lsp.openDoc(cwd,
 handle('lsp:change', (cwd: string, path: string, text: string) => Lsp.changeDoc(cwd, path, text))
 handle('lsp:close', (cwd: string, path: string) => Lsp.closeDoc(cwd, path))
 handle('lsp:status', (cwd: string, path: string) => Lsp.statusFor(cwd, path))
+handle('lsp:hover', (cwd: string, path: string, line: number, ch: number) => Lsp.hover(cwd, path, line, ch))
+handle('lsp:definition', (cwd: string, path: string, line: number, ch: number) => Lsp.definition(cwd, path, line, ch))
+handle('lsp:completion', (cwd: string, path: string, line: number, ch: number) => Lsp.completion(cwd, path, line, ch))
 
 handle('repo:status', (cwd: string) => G.status(cwd))
 handle('repo:hidden', (cwd: string) => G.hiddenFiles(cwd))

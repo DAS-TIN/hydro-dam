@@ -295,6 +295,11 @@ const api = {
   lspChange: (cwd: string, path: string, text: string) => call<void>('lsp:change', cwd, path, text),
   lspClose: (cwd: string, path: string) => call<void>('lsp:close', cwd, path),
   lspStatus: (cwd: string, path: string) => call<any>('lsp:status', cwd, path),
+  lspHover: (cwd: string, path: string, line: number, ch: number) => call<any>('lsp:hover', cwd, path, line, ch),
+  lspDefinition: (cwd: string, path: string, line: number, ch: number) =>
+    call<any>('lsp:definition', cwd, path, line, ch),
+  lspCompletion: (cwd: string, path: string, line: number, ch: number) =>
+    call<any>('lsp:completion', cwd, path, line, ch),
   onLspDiagnostics: (cb: (p: { cwd: string; path: string; diagnostics: any[] }) => void) => {
     const listener = (_e: unknown, p: any) => cb(p)
     ipcRenderer.on('lsp:diagnostics', listener)

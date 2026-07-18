@@ -105,7 +105,15 @@ export default function FileContent({
         // Markdown edits render live on the right, word-processor style.
         <div className="grid min-h-0 flex-1 grid-cols-2">
           <div className="min-h-0 overflow-auto border-r border-ink-800">
-            <CodeEditor value={draft} onChange={setDraft} path={path} onSave={save} diagnostics={diagnostics} />
+            <CodeEditor
+              value={draft}
+              onChange={setDraft}
+              path={path}
+              cwd={cwd}
+              onSave={save}
+              diagnostics={diagnostics}
+              onDefinition={(loc) => toast?.('ok', `Definition: ${loc.path}:${loc.line + 1}`)}
+            />
           </div>
           <div className="min-h-0 overflow-auto bg-ink-900">
             <Markdown text={draft} />
@@ -113,7 +121,15 @@ export default function FileContent({
         </div>
       ) : (
         <div className="min-h-0 flex-1 overflow-auto">
-          <CodeEditor value={draft} onChange={setDraft} path={path} onSave={save} diagnostics={diagnostics} />
+          <CodeEditor
+              value={draft}
+              onChange={setDraft}
+              path={path}
+              cwd={cwd}
+              onSave={save}
+              diagnostics={diagnostics}
+              onDefinition={(loc) => toast?.('ok', `Definition: ${loc.path}:${loc.line + 1}`)}
+            />
         </div>
       )
     ) : view === 'preview' && md ? (

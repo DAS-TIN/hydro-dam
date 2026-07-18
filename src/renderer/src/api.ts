@@ -826,8 +826,31 @@ export interface HydrodamApi {
   lspChange(cwd: string, path: string, text: string): Promise<void>
   lspClose(cwd: string, path: string): Promise<void>
   lspStatus(cwd: string, path: string): Promise<LspStatus>
+  lspHover(cwd: string, path: string, line: number, ch: number): Promise<LspHover | null>
+  lspDefinition(cwd: string, path: string, line: number, ch: number): Promise<LspLocation | LspLocation[] | null>
+  lspCompletion(cwd: string, path: string, line: number, ch: number): Promise<LspCompletionResult | null>
   onLspDiagnostics(cb: (p: LspDiagnosticsEvent) => void): () => void
 }
+
+export interface LspHover {
+  contents: string | { value: string } | { language: string; value: string } | Array<string | { value: string }>
+  range?: LspRange
+}
+
+export interface LspLocation {
+  uri: string
+  range: LspRange
+}
+
+export interface LspCompletionItem {
+  label: string
+  detail?: string
+  kind?: number
+  insertText?: string
+  documentation?: string | { value: string }
+}
+
+export type LspCompletionResult = LspCompletionItem[] | { items: LspCompletionItem[] }
 
 export interface LspStatus {
   status: 'starting' | 'running' | 'not-found' | 'error' | 'unsupported'

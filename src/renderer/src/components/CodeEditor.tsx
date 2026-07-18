@@ -1,11 +1,12 @@
 import React, { useEffect, useRef } from 'react'
-import { EditorView, keymap } from '@codemirror/view'
+import { EditorView, keymap, hoverTooltip } from '@codemirror/view'
 import { EditorState, Compartment, Extension } from '@codemirror/state'
+import { autocompletion, CompletionContext, Completion } from '@codemirror/autocomplete'
 import { indentWithTab } from '@codemirror/commands'
 import { lintGutter, setDiagnostics, Diagnostic } from '@codemirror/lint'
 import { basicSetup } from 'codemirror'
 import { oneDark } from '@codemirror/theme-one-dark'
-import { LspDiagnostic } from '../api'
+import { api, LspDiagnostic, LspHover, LspCompletionItem } from '../api'
 import { javascript } from '@codemirror/lang-javascript'
 import { python } from '@codemirror/lang-python'
 import { css } from '@codemirror/lang-css'
@@ -80,6 +81,21 @@ const appTheme = EditorView.theme({
 
 const SEVERITY: Record<number, Diagnostic['severity']> = { 1: 'error', 2: 'warning', 3: 'info', 4: 'hint' }
 
+// LSP CompletionItemKind -> a CodeMirror completion type (drives the little icon).
+const CMPL_KIND: Record<number, string> = {
+  2: 'method', 3: 'function', 4: 'function', 5: 'property', 6: 'variable', 7: 'class',
+  8: 'interface', 9: 'namespace', 10: 'property', 13: 'enum', 14: 'keyword', 21: 'constant'
+}
+
+// Flatten an LSP hover payload (string / MarkupContent / MarkedString[]) to plain
+// text, dropping code fences so the tooltip stays readable.
+function hoverText(h: LspHover | null): string {
+  if (!h) return ''
+  const one = (x: unknown): string => (typeof x === 'string' ? x : ((x as { value?: string })?.value ?? ''))
+  const raw = Array.isArray(h.contents) ? h.contents.map(one).join('\n\n') : one(h.contents)
+  return raw.replace(/```[\w-]*\n?/g, '').trim()
+}
+
 // Turn LSP diagnostics (line/character ranges) into CodeMirror ones (document
 // offsets), clamping anything that points past the current text.
 function toCmDiagnostics(view: EditorView, diags: LspDiagnostic[]): Diagnostic[] {
@@ -109,39 +125,106 @@ export default function CodeEditor({
   value,
   onChange,
   path,
+  cwd,
   onSave,
+  onDefinition,
   diagnostics
 }: {
   value: string
   onChange: (v: string) => void
   path: string
+  cwd?: string
   onSave?: () => void
+  onDefinition?: (loc: { uri: string; path: string; line: number }) => void
   diagnostics?: LspDiagnostic[]
 }) {
   const host = useRef<HTMLDivElement>(null)
   const view = useRef<EditorView | null>(null)
   const language = useRef(new Compartment())
-  // Keep the latest callbacks reachable from CodeMirror without rebuilding it.
-  const cb = useRef({ onChange, onSave })
-  cb.current = { onChange, onSave }
+  // Keep the latest callbacks + file identity reachable from CodeMirror without
+  // rebuilding the editor.
+  const cb = useRef({ onChange, onSave, onDefinition })
+  cb.current = { onChange, onSave, onDefinition }
+  const meta = useRef({ cwd: cwd ?? '', path })
+  meta.current = { cwd: cwd ?? '', path }
 
   useEffect(() => {
     if (!host.current) return
+
+    const lspHover = hoverTooltip(async (v, pos) => {
+      const { cwd, path } = meta.current
+      if (!cwd) return null
+      const line = v.state.doc.lineAt(pos)
+      const h = await api().lspHover(cwd, path, line.number - 1, pos - line.from).catch(() => null)
+      const text = hoverText(h)
+      if (!text) return null
+      return {
+        pos,
+        above: true,
+        create: () => {
+          const dom = document.createElement('div')
+          dom.textContent = text
+          dom.style.cssText = 'padding:4px 8px;max-width:480px;white-space:pre-wrap;font-size:12px'
+          return { dom }
+        }
+      }
+    })
+
+    const lspComplete = autocompletion({
+      override: [
+        async (ctx: CompletionContext) => {
+          const { cwd, path } = meta.current
+          if (!cwd) return null
+          const word = ctx.matchBefore(/[\w$]+/)
+          if (!ctx.explicit && !word) return null
+          const line = ctx.state.doc.lineAt(ctx.pos)
+          const res = await api().lspCompletion(cwd, path, line.number - 1, ctx.pos - line.from).catch(() => null)
+          const items: LspCompletionItem[] = Array.isArray(res) ? res : (res?.items ?? [])
+          if (!items.length) return null
+          const options: Completion[] = items.slice(0, 200).map((it) => ({
+            label: it.label,
+            detail: it.detail,
+            type: it.kind ? CMPL_KIND[it.kind] : undefined,
+            apply: it.insertText || it.label
+          }))
+          return { from: word ? word.from : ctx.pos, options }
+        }
+      ]
+    })
+
+    const goToDefinition = async (v: EditorView): Promise<void> => {
+      const { cwd, path } = meta.current
+      if (!cwd) return
+      const pos = v.state.selection.main.head
+      const line = v.state.doc.lineAt(pos)
+      const res = await api().lspDefinition(cwd, path, line.number - 1, pos - line.from).catch(() => null)
+      const loc = Array.isArray(res) ? res[0] : res
+      if (!loc) return
+      const target = decodeURIComponent(loc.uri)
+        .replace(/^file:\/\//, '')
+        .replace(/^\/([A-Za-z]:)/, '$1')
+      const here = `${cwd}/${path}`.replace(/\\/g, '/')
+      if (target === here || target.replace(/\\/g, '/').endsWith(path)) {
+        const l = v.state.doc.line(Math.min(loc.range.start.line + 1, v.state.doc.lines))
+        v.dispatch({ selection: { anchor: l.from + loc.range.start.character }, scrollIntoView: true })
+        v.focus()
+      } else {
+        cb.current.onDefinition?.({ uri: loc.uri, path: target, line: loc.range.start.line })
+      }
+    }
+
     const state = EditorState.create({
       doc: value,
       extensions: [
         basicSetup,
         keymap.of([
           indentWithTab,
-          {
-            key: 'Mod-s',
-            run: () => {
-              cb.current.onSave?.()
-              return true
-            }
-          }
+          { key: 'Mod-s', run: () => (cb.current.onSave?.(), true) },
+          { key: 'F12', run: (v) => (goToDefinition(v), true) }
         ]),
         language.current.of(langForPath(path)),
+        lspHover,
+        lspComplete,
         lintGutter(),
         oneDark,
         appTheme,
