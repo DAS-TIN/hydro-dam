@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { api, FilePreview as Preview, humanSize } from '../api'
+import { api, FilePreview as Preview, LspDiagnostic, humanSize } from '../api'
 import { isMarkdown } from '../highlight'
 import CodeView from './CodeView'
 import CodeEditor from './CodeEditor'
@@ -33,6 +33,32 @@ export default function FileContent({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   const [saving, setSaving] = useState(false)
+  const [diagnostics, setDiagnostics] = useState<LspDiagnostic[]>([])
+
+  // Hand the file to the language server while editing, and listen for the
+  // diagnostics it publishes back for this exact file.
+  useEffect(() => {
+    if (!editing) return
+    let live = true
+    api().lspOpen(cwd, path, draft).catch(() => {})
+    const off = api().onLspDiagnostics((p) => {
+      if (live && p.cwd === cwd && p.path === path) setDiagnostics(p.diagnostics)
+    })
+    return () => {
+      live = false
+      off()
+      api().lspClose(cwd, path).catch(() => {})
+      setDiagnostics([])
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing, cwd, path])
+
+  // Debounced didChange so the server re-lints as you type, not every keystroke.
+  useEffect(() => {
+    if (!editing) return
+    const t = setTimeout(() => api().lspChange(cwd, path, draft).catch(() => {}), 400)
+    return () => clearTimeout(t)
+  }, [draft, editing, cwd, path])
 
   useEffect(() => {
     let live = true
@@ -79,7 +105,7 @@ export default function FileContent({
         // Markdown edits render live on the right, word-processor style.
         <div className="grid min-h-0 flex-1 grid-cols-2">
           <div className="min-h-0 overflow-auto border-r border-ink-800">
-            <CodeEditor value={draft} onChange={setDraft} path={path} onSave={save} />
+            <CodeEditor value={draft} onChange={setDraft} path={path} onSave={save} diagnostics={diagnostics} />
           </div>
           <div className="min-h-0 overflow-auto bg-ink-900">
             <Markdown text={draft} />
@@ -87,7 +113,7 @@ export default function FileContent({
         </div>
       ) : (
         <div className="min-h-0 flex-1 overflow-auto">
-          <CodeEditor value={draft} onChange={setDraft} path={path} onSave={save} />
+          <CodeEditor value={draft} onChange={setDraft} path={path} onSave={save} diagnostics={diagnostics} />
         </div>
       )
     ) : view === 'preview' && md ? (

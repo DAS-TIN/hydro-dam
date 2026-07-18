@@ -2,8 +2,10 @@ import React, { useEffect, useRef } from 'react'
 import { EditorView, keymap } from '@codemirror/view'
 import { EditorState, Compartment, Extension } from '@codemirror/state'
 import { indentWithTab } from '@codemirror/commands'
+import { lintGutter, setDiagnostics, Diagnostic } from '@codemirror/lint'
 import { basicSetup } from 'codemirror'
 import { oneDark } from '@codemirror/theme-one-dark'
+import { LspDiagnostic } from '../api'
 import { javascript } from '@codemirror/lang-javascript'
 import { python } from '@codemirror/lang-python'
 import { css } from '@codemirror/lang-css'
@@ -76,6 +78,28 @@ const appTheme = EditorView.theme({
   '.cm-scroller': { fontFamily: "'JetBrains Mono', ui-monospace, monospace" }
 })
 
+const SEVERITY: Record<number, Diagnostic['severity']> = { 1: 'error', 2: 'warning', 3: 'info', 4: 'hint' }
+
+// Turn LSP diagnostics (line/character ranges) into CodeMirror ones (document
+// offsets), clamping anything that points past the current text.
+function toCmDiagnostics(view: EditorView, diags: LspDiagnostic[]): Diagnostic[] {
+  const doc = view.state.doc
+  const offset = (line: number, ch: number): number => {
+    const l = doc.line(Math.min(Math.max(line, 0), doc.lines - 1) + 1)
+    return Math.min(l.from + Math.max(ch, 0), l.to)
+  }
+  return diags.map((d) => {
+    const from = offset(d.range.start.line, d.range.start.character)
+    const to = Math.max(from, offset(d.range.end.line, d.range.end.character))
+    return {
+      from,
+      to,
+      severity: SEVERITY[d.severity ?? 1] ?? 'error',
+      message: d.source ? `${d.message} (${d.source})` : d.message
+    }
+  })
+}
+
 /**
  * A CodeMirror 6 editor with the same props the old textarea version exposed, so
  * callers don't change. Language is chosen from the file extension; the LSP
@@ -85,12 +109,14 @@ export default function CodeEditor({
   value,
   onChange,
   path,
-  onSave
+  onSave,
+  diagnostics
 }: {
   value: string
   onChange: (v: string) => void
   path: string
   onSave?: () => void
+  diagnostics?: LspDiagnostic[]
 }) {
   const host = useRef<HTMLDivElement>(null)
   const view = useRef<EditorView | null>(null)
@@ -116,6 +142,7 @@ export default function CodeEditor({
           }
         ]),
         language.current.of(langForPath(path)),
+        lintGutter(),
         oneDark,
         appTheme,
         EditorView.updateListener.of((u) => {
@@ -146,6 +173,12 @@ export default function CodeEditor({
       v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: value } })
     }
   }, [value])
+
+  // Paint the latest diagnostics from the language server.
+  useEffect(() => {
+    const v = view.current
+    if (v) v.dispatch(setDiagnostics(v.state, toCmDiagnostics(v, diagnostics ?? [])))
+  }, [diagnostics])
 
   return <div ref={host} className="h-full min-h-0 overflow-auto" />
 }
