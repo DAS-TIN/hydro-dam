@@ -77,7 +77,28 @@ function langForPath(path: string): Extension[] {
 
 const appTheme = EditorView.theme({
   '&': { fontSize: '12.5px', height: '100%' },
-  '.cm-scroller': { fontFamily: "'JetBrains Mono', ui-monospace, monospace" }
+  '.cm-scroller': { fontFamily: "'JetBrains Mono', ui-monospace, monospace" },
+  // Center the fold chevrons in the gutter so they line up with the digits, and
+  // keep them quiet until hovered.
+  '.cm-foldGutter .cm-gutterElement': {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '14px',
+    color: '#4a5170',
+    cursor: 'pointer'
+  },
+  '.cm-foldGutter .cm-gutterElement:hover': { color: '#9aa4c4' },
+  // The collapsed section reads as a small pill on the line instead of raw dots.
+  '.cm-foldPlaceholder': {
+    background: '#2a2f45',
+    border: '1px solid #3a4160',
+    color: '#9aa4c4',
+    borderRadius: '5px',
+    padding: '0 6px',
+    margin: '0 3px',
+    fontSize: '11px'
+  }
 })
 
 const SEVERITY: Record<number, Diagnostic['severity']> = { 1: 'error', 2: 'warning', 3: 'info', 4: 'hint' }
