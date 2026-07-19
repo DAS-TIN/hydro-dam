@@ -139,6 +139,17 @@ function FocusHalo({ on }: { on: boolean }) {
 // source of truth; undo/redo just replay the inverse command.
 type UndoOp = { label: string; undo: () => Promise<unknown>; redo: () => Promise<unknown> }
 
+// One open editor tab. `isChange` files came from the Changes list (so they have
+// a diff and staged/untracked context); others were opened from the file tree.
+type EditorTab = {
+  path: string
+  isChange: boolean
+  staged: boolean
+  untracked: boolean
+  file?: FileEntry
+  preview: boolean
+}
+
 // A compact top-bar action: icon over label, with an optional count badge.
 function ToolBtn({
   icon,
@@ -263,6 +274,9 @@ export default function App() {
   const [leftMode, setLeftMode] = useState<'changes' | 'tree'>('changes')
   const [treePaths, setTreePaths] = useState<string[]>([])
   const [previewPath, setPreviewPath] = useState<string | null>(null)
+  // Open editor tabs, shared by Changes and Files. A single "preview" tab (shown
+  // italic) is reused on single-click; editing or double-click pins it.
+  const [tabs, setTabs] = useState<EditorTab[]>([])
 
   const [message, setMessage] = useState('')
   const [amend, setAmend] = useState(false)
@@ -516,16 +530,74 @@ export default function App() {
     return () => clearTimeout(t)
   }, [cwd, sel, status])
 
+  const activePath = sel ? sel.file.path : previewPath
+
+  // Add or refresh a tab for a path, reusing the lone preview slot unless it's
+  // already open. `pin` makes it a permanent (non-preview) tab.
+  function openTab(tab: Omit<EditorTab, 'preview'>, pin = false) {
+    setTabs((cur) => {
+      const existing = cur.find((t) => t.path === tab.path)
+      if (existing) {
+        return cur.map((t) => (t.path === tab.path ? { ...t, ...tab, preview: pin ? false : t.preview } : t))
+      }
+      const fresh: EditorTab = { ...tab, preview: !pin }
+      const previewIdx = cur.findIndex((t) => t.preview)
+      if (previewIdx !== -1) {
+        const next = [...cur]
+        next[previewIdx] = fresh
+        return next
+      }
+      return [...cur, fresh]
+    })
+  }
+
   function selectFile(file: FileEntry, staged: boolean) {
     setPreviewPath(null)
     if (sel?.file.path !== file.path) setViewTab('diff')
     setSel({ file, staged })
+    openTab({ path: file.path, isChange: true, staged, untracked: file.untracked, file })
   }
 
   function selectTreeFile(path: string) {
     setSel(null)
     setPreviewPath(path)
+    openTab({ path, isChange: false, staged: false, untracked: false })
   }
+
+  // Make a tab the active one, restoring its diff/file context.
+  function activateTab(t: EditorTab) {
+    setViewTab('diff')
+    if (t.isChange && t.file) {
+      setPreviewPath(null)
+      setSel({ file: t.file, staged: t.staged })
+    } else {
+      setSel(null)
+      setPreviewPath(t.path)
+    }
+  }
+
+  function closeTab(path: string) {
+    setTabs((cur) => {
+      const idx = cur.findIndex((t) => t.path === path)
+      const next = cur.filter((t) => t.path !== path)
+      if (activePath === path) {
+        const neighbour = next[Math.min(idx, next.length - 1)]
+        if (neighbour) activateTab(neighbour)
+        else {
+          setSel(null)
+          setPreviewPath(null)
+        }
+      }
+      return next
+    })
+  }
+
+  // Editing a preview tab pins it, like VS Code.
+  useEffect(() => {
+    if (fileDirty && activePath) {
+      setTabs((cur) => cur.map((t) => (t.path === activePath ? { ...t, preview: false } : t)))
+    }
+  }, [fileDirty, activePath])
 
   const selKey = sel ? sel.file.path + (sel.staged ? ':staged' : '') : null
 
@@ -2174,6 +2246,45 @@ export default function App() {
               </div>
             )
           })()}
+          {mainTab === 'diff' && tabs.length > 0 && (
+            <div className="flex shrink-0 items-stretch overflow-x-auto border-b border-ink-800 bg-ink-950">
+              {tabs.map((t) => {
+                const active = activePath === t.path
+                return (
+                  <div
+                    key={t.path}
+                    onClick={() => activateTab(t)}
+                    onDoubleClick={() =>
+                      setTabs((cur) => cur.map((x) => (x.path === t.path ? { ...x, preview: false } : x)))
+                    }
+                    onAuxClick={(e) => e.button === 1 && closeTab(t.path)}
+                    title={t.path}
+                    className={`group flex shrink-0 cursor-pointer items-center gap-2 border-r border-ink-800 px-3 py-1.5 text-xs ${
+                      active ? 'bg-ink-900 text-white' : 'text-slate-400 hover:bg-ink-900/60'
+                    } ${t.preview ? 'italic' : ''}`}
+                  >
+                    <span className="max-w-[160px] truncate">{basename(t.path)}</span>
+                    {active && fileDirty ? (
+                      <span className="h-2 w-2 shrink-0 rounded-full bg-slate-100" title="Unsaved" />
+                    ) : (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          closeTab(t.path)
+                        }}
+                        className="flex h-4 w-4 items-center justify-center rounded text-slate-500 opacity-0 hover:bg-ink-700 hover:text-slate-200 group-hover:opacity-100"
+                        title="Close"
+                      >
+                        <svg width="10" height="10" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" fill="none">
+                          <path d="M5 5l14 14M19 5L5 19" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
           {mainTab === 'diff' && (previewPath ? (
             <FilePreview cwd={cwd} path={previewPath} toast={(k, t) => toast(k, t)} />
           ) : sel ? (
