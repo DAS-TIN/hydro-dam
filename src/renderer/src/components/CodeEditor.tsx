@@ -7,6 +7,7 @@ import { lintGutter, setDiagnostics, Diagnostic } from '@codemirror/lint'
 import { basicSetup } from 'codemirror'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { api, LspDiagnostic, LspHover, LspCompletionItem } from '../api'
+import { inlineSuggestion } from './inlineSuggest'
 import { javascript } from '@codemirror/lang-javascript'
 import { python } from '@codemirror/lang-python'
 import { css } from '@codemirror/lang-css'
@@ -147,6 +148,11 @@ export default function CodeEditor({
   cb.current = { onChange, onSave, onDefinition }
   const meta = useRef({ cwd: cwd ?? '', path })
   meta.current = { cwd: cwd ?? '', path }
+  // Only fetch AI ghost-text once we know a provider is configured.
+  const aiOk = useRef(false)
+  useEffect(() => {
+    api().aiAvailable().then((v) => (aiOk.current = v)).catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (!host.current) return
@@ -225,6 +231,11 @@ export default function CodeEditor({
         language.current.of(langForPath(path)),
         lspHover,
         lspComplete,
+        inlineSuggestion(async (prefix, suffix) => {
+          if (!aiOk.current) return ''
+          const lang = meta.current.path.split('.').pop()?.toLowerCase() || 'text'
+          return api().aiInlineComplete(prefix, suffix, lang).catch(() => '')
+        }),
         lintGutter(),
         oneDark,
         appTheme,

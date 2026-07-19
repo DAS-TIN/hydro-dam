@@ -775,6 +775,7 @@ export interface HydrodamApi {
   conflictDeleteFile(cwd: string, path: string): Promise<void>
   conflictResolve(cwd: string, path: string, content: string): Promise<void>
   aiAvailable(): Promise<boolean>
+  aiInlineComplete(prefix: string, suffix: string, language: string): Promise<string>
   aiResolveConflict(cwd: string, path: string): Promise<string>
   aiCommitMessage(cwd: string): Promise<string>
   aiPrDescribe(cwd: string, base: string, head: string): Promise<string>

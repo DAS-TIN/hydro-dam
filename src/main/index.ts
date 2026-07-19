@@ -970,8 +970,22 @@ handle('conflicts:deleteFile', (cwd: string, path: string) => G.conflictDeleteFi
 handle('conflicts:resolve', (cwd: string, path: string, content: string) =>
   G.resolveWith(cwd, path, content)
 )
-handle('ai:available', () => !!Store.getSettings().anthropicApiKey?.trim())
+handle('ai:available', () => {
+  const s = Store.getSettings()
+  return !!(s.aiApiKey?.trim() || (s.aiProvider === 'anthropic' && s.anthropicApiKey?.trim()))
+})
 handle('ai:resolveConflict', (cwd: string, path: string) => aiResolveConflict(cwd, path))
+
+// Inline "ghost text": continue the code at the cursor. Short and fence-free so
+// it can be inserted verbatim.
+handle('ai:inlineComplete', async (prefix: string, suffix: string, language: string) => {
+  const sys =
+    'You are a code autocomplete engine. Continue the code at the cursor. Reply with ONLY the raw ' +
+    'characters to insert at the cursor - no explanation, no markdown fences, and do not repeat code ' +
+    'that is already there. Keep it short: finish the current line or add a few lines at most.'
+  const user = `Language: ${language}\n<before_cursor>\n${prefix}\n</before_cursor>\n<after_cursor>\n${suffix}\n</after_cursor>`
+  return stripFences(await aiText(sys, user, 160))
+})
 
 handle('ai:commitMessage', async (cwd: string) => {
   let diff = await G.git(cwd, ['diff', '--cached', '--no-color']).catch(() => '')

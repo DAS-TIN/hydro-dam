@@ -230,6 +230,8 @@ const api = {
   conflictResolve: (cwd: string, path: string, content: string) =>
     call<void>('conflicts:resolve', cwd, path, content),
   aiAvailable: () => call<boolean>('ai:available'),
+  aiInlineComplete: (prefix: string, suffix: string, language: string) =>
+    call<string>('ai:inlineComplete', prefix, suffix, language),
   aiResolveConflict: (cwd: string, path: string) => call<string>('ai:resolveConflict', cwd, path),
   aiCommitMessage: (cwd: string) => call<string>('ai:commitMessage', cwd),
   aiPrDescribe: (cwd: string, base: string, head: string) => call<string>('ai:prDescribe', cwd, base, head),
