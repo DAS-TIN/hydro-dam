@@ -25,13 +25,13 @@ export default function FilePreview({
   return (
     <>
       <div className="flex items-center gap-3 border-b border-ink-800 px-4 py-2.5">
-        <span className="flex min-w-0 items-center gap-1.5">
-          <span
-            className={`h-2 w-2 shrink-0 rounded-full bg-slate-100 transition-opacity ${dirty ? 'opacity-100' : 'opacity-0'}`}
-            title={dirty ? 'Unsaved changes - Ctrl+S to save' : undefined}
-          />
-          <span className="truncate text-sm font-medium text-slate-100">{path}</span>
-        </span>
+        <span className="truncate text-sm font-medium text-slate-100">{path}</span>
+        {dirty && (
+          <span className="flex shrink-0 items-center gap-1 text-[11px] text-slate-400" title="Ctrl+S to save">
+            <span className="h-2 w-2 rounded-full bg-slate-100" />
+            unsaved
+          </span>
+        )}
         {info && <span className="text-[11px] text-slate-500">{humanSize(info.size)}</span>}
         {md && (
           <div className="flex shrink-0 gap-0.5 rounded-md bg-ink-950 p-0.5">

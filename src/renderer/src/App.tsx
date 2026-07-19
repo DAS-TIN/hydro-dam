@@ -2180,13 +2180,13 @@ export default function App() {
             <>
               {/* wraps on narrow windows so the action buttons never clip away */}
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-ink-800 px-4 py-2.5">
-                <span className="flex min-w-0 items-center gap-1.5">
-                  <span
-                    className={`h-2 w-2 shrink-0 rounded-full bg-slate-100 transition-opacity ${fileDirty ? 'opacity-100' : 'opacity-0'}`}
-                    title={fileDirty ? 'Unsaved changes - Ctrl+S to save' : undefined}
-                  />
-                  <span className="min-w-0 truncate text-sm font-medium text-slate-100">{sel.file.path}</span>
-                </span>
+                <span className="min-w-0 truncate text-sm font-medium text-slate-100">{sel.file.path}</span>
+                {fileDirty && (
+                  <span className="flex shrink-0 items-center gap-1 text-[11px] text-slate-400" title="Ctrl+S to save">
+                    <span className="h-2 w-2 rounded-full bg-slate-100" />
+                    unsaved
+                  </span>
+                )}
                 <span className="text-[11px] text-slate-500">
                   {sel.staged ? 'staged changes' : sel.file.untracked ? 'new file' : 'working changes'}
                 </span>
