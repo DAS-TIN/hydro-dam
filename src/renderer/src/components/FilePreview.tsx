@@ -15,6 +15,7 @@ export default function FilePreview({
   const md = isMarkdown(path)
   const [view, setView] = useState<'code' | 'preview'>(md ? 'preview' : 'code')
   const [info, setInfo] = useState<Preview | null>(null)
+  const [dirty, setDirty] = useState(false)
 
   useEffect(() => setView(isMarkdown(path) ? 'preview' : 'code'), [path])
 
@@ -24,7 +25,13 @@ export default function FilePreview({
   return (
     <>
       <div className="flex items-center gap-3 border-b border-ink-800 px-4 py-2.5">
-        <span className="truncate text-sm font-medium text-slate-100">{path}</span>
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span
+            className={`h-2 w-2 shrink-0 rounded-full bg-slate-100 transition-opacity ${dirty ? 'opacity-100' : 'opacity-0'}`}
+            title={dirty ? 'Unsaved changes - Ctrl+S to save' : undefined}
+          />
+          <span className="truncate text-sm font-medium text-slate-100">{path}</span>
+        </span>
         {info && <span className="text-[11px] text-slate-500">{humanSize(info.size)}</span>}
         {md && (
           <div className="flex shrink-0 gap-0.5 rounded-md bg-ink-950 p-0.5">
@@ -50,7 +57,15 @@ export default function FilePreview({
         </button>
       </div>
       <div className="min-h-0 flex-1 overflow-auto bg-ink-900">
-        <FileContent cwd={cwd} path={path} view={view} editable toast={toast} onLoaded={setInfo} />
+        <FileContent
+          cwd={cwd}
+          path={path}
+          view={view}
+          editable
+          toast={toast}
+          onLoaded={setInfo}
+          onDirtyChange={setDirty}
+        />
       </div>
     </>
   )

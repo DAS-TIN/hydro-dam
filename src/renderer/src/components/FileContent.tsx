@@ -18,7 +18,8 @@ export default function FileContent({
   editable,
   toast,
   onSaved,
-  onLoaded
+  onLoaded,
+  onDirtyChange
 }: {
   cwd: string
   path: string
@@ -27,18 +28,23 @@ export default function FileContent({
   toast?: (kind: 'ok' | 'err', text: string) => void
   onSaved?: () => void
   onLoaded?: (p: Preview) => void
+  onDirtyChange?: (dirty: boolean) => void
 }) {
   const [data, setData] = useState<Preview | null>(null)
   const [error, setError] = useState('')
-  const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   const [saving, setSaving] = useState(false)
   const [diagnostics, setDiagnostics] = useState<LspDiagnostic[]>([])
 
-  // Hand the file to the language server while editing, and listen for the
-  // diagnostics it publishes back for this exact file.
+  const active = !!editable && data?.kind === 'text'
+  const dirty = active && draft !== (data?.text ?? '')
+
+  useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange])
+
+  // While a file is open for editing, hand it to the language server and listen
+  // for the diagnostics it publishes back for this exact file.
   useEffect(() => {
-    if (!editing) return
+    if (!active) return
     let live = true
     api().lspOpen(cwd, path, draft).catch(() => {})
     const off = api().onLspDiagnostics((p) => {
@@ -51,25 +57,25 @@ export default function FileContent({
       setDiagnostics([])
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editing, cwd, path])
+  }, [active, cwd, path])
 
   // Debounced didChange so the server re-lints as you type, not every keystroke.
   useEffect(() => {
-    if (!editing) return
+    if (!active) return
     const t = setTimeout(() => api().lspChange(cwd, path, draft).catch(() => {}), 400)
     return () => clearTimeout(t)
-  }, [draft, editing, cwd, path])
+  }, [draft, active, cwd, path])
 
   useEffect(() => {
     let live = true
     setData(null)
     setError('')
-    setEditing(false)
     api()
       .readFile(cwd, path)
       .then((p) => {
         if (!live) return
         setData(p)
+        setDraft(p.text ?? '')
         onLoaded?.(p)
       })
       .catch((e) => live && setError(e.message))
@@ -80,13 +86,12 @@ export default function FileContent({
   }, [cwd, path])
 
   const save = async () => {
+    if (saving || !dirty) return
     setSaving(true)
     try {
       await api().writeFile(cwd, path, draft)
       const fresh = await api().readFile(cwd, path)
       setData(fresh)
-      setEditing(false)
-      toast?.('ok', `Saved ${path}.`)
       onSaved?.()
     } catch (e: any) {
       toast?.('err', e?.message || String(e))
@@ -100,76 +105,36 @@ export default function FileContent({
 
   if (data.kind === 'text') {
     const md = isMarkdown(path)
-    const body = editing ? (
-      md ? (
-        // Markdown edits render live on the right, word-processor style.
-        <div className="grid min-h-0 flex-1 grid-cols-2">
-          <div className="min-h-0 overflow-auto border-r border-ink-800">
-            <CodeEditor
-              value={draft}
-              onChange={setDraft}
-              path={path}
-              cwd={cwd}
-              onSave={save}
-              diagnostics={diagnostics}
-              onDefinition={(loc) => toast?.('ok', `Definition: ${loc.path}:${loc.line + 1}`)}
-            />
-          </div>
-          <div className="min-h-0 overflow-auto bg-ink-900">
-            <Markdown text={draft} />
-          </div>
-        </div>
+
+    // Not editable: read-only view, rendered markdown in preview mode.
+    if (!editable) {
+      return view === 'preview' && md ? (
+        <Markdown text={data.text ?? ''} />
       ) : (
+        <CodeView text={data.text ?? ''} path={path} />
+      )
+    }
+
+    // Editable: markdown in preview mode renders the (unsaved) draft; everything
+    // else is the live editor. Ctrl+S saves; the dirty dot lives in the header.
+    if (md && view === 'preview') {
+      return (
         <div className="min-h-0 flex-1 overflow-auto">
-          <CodeEditor
-              value={draft}
-              onChange={setDraft}
-              path={path}
-              cwd={cwd}
-              onSave={save}
-              diagnostics={diagnostics}
-              onDefinition={(loc) => toast?.('ok', `Definition: ${loc.path}:${loc.line + 1}`)}
-            />
+          <Markdown text={draft} />
         </div>
       )
-    ) : view === 'preview' && md ? (
-      <Markdown text={data.text ?? ''} />
-    ) : (
-      <CodeView text={data.text ?? ''} path={path} />
-    )
-
-    if (!editable) return body
-
+    }
     return (
-      <div className={editing ? 'flex h-full min-h-0 flex-col' : undefined}>
-        <div className="sticky top-0 z-10 flex items-center gap-1.5 border-b border-ink-800 bg-ink-900/95 px-3 py-1 backdrop-blur">
-          {editing ? (
-            <>
-              <span className="text-[11px] text-warn">editing</span>
-              <span className="flex-1" />
-              <button className="btn-ghost text-xs" disabled={saving} onClick={() => setEditing(false)}>
-                Cancel
-              </button>
-              <button className="btn-accent text-xs" disabled={saving} onClick={save} title="Ctrl+S">
-                Save
-              </button>
-            </>
-          ) : (
-            <>
-              <span className="flex-1" />
-              <button
-                className="btn-ghost text-xs"
-                onClick={() => {
-                  setDraft(data.text ?? '')
-                  setEditing(true)
-                }}
-              >
-                Edit
-              </button>
-            </>
-          )}
-        </div>
-        {body}
+      <div className="h-full min-h-0">
+        <CodeEditor
+          value={draft}
+          onChange={setDraft}
+          path={path}
+          cwd={cwd}
+          onSave={save}
+          diagnostics={diagnostics}
+          onDefinition={(loc) => toast?.('ok', `Definition: ${loc.path}:${loc.line + 1}`)}
+        />
       </div>
     )
   }

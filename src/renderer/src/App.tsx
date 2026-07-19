@@ -250,6 +250,7 @@ export default function App() {
   const [hidden, setHidden] = useState<string[]>([])
   const [seenUntracked, setSeenUntracked] = useState<string[]>([])
   const [seenIgnored, setSeenIgnored] = useState<string[]>([])
+  const [fileDirty, setFileDirty] = useState(false)
   const [branches, setBranches] = useState<Branch[]>([])
   const [coauthors, setCoauthors] = useState<Coauthor[]>([])
 
@@ -2179,7 +2180,13 @@ export default function App() {
             <>
               {/* wraps on narrow windows so the action buttons never clip away */}
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-ink-800 px-4 py-2.5">
-                <span className="min-w-0 truncate text-sm font-medium text-slate-100">{sel.file.path}</span>
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span
+                    className={`h-2 w-2 shrink-0 rounded-full bg-slate-100 transition-opacity ${fileDirty ? 'opacity-100' : 'opacity-0'}`}
+                    title={fileDirty ? 'Unsaved changes - Ctrl+S to save' : undefined}
+                  />
+                  <span className="min-w-0 truncate text-sm font-medium text-slate-100">{sel.file.path}</span>
+                </span>
                 <span className="text-[11px] text-slate-500">
                   {sel.staged ? 'staged changes' : sel.file.untracked ? 'new file' : 'working changes'}
                 </span>
@@ -2258,6 +2265,7 @@ export default function App() {
                     editable
                     toast={(k, t) => toast(k, t)}
                     onSaved={() => refresh()}
+                    onDirtyChange={setFileDirty}
                   />
                 ) : IMAGE_RE.test(sel.file.path) ? (
                   <ImageDiff
