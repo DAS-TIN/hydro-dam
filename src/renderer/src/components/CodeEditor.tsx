@@ -281,10 +281,12 @@ export default function CodeEditor({
     view.current?.dispatch({ effects: language.current.reconfigure(langForPath(path)) })
   }, [path])
 
-  // Push external value changes in without clobbering local edits.
+  // Push external value changes in without clobbering local edits. CodeMirror's
+  // doc is LF-only, so ignore pure CRLF/LF differences or a freshly opened CRLF
+  // file would be rewritten (and look edited) the instant it loads.
   useEffect(() => {
     const v = view.current
-    if (v && value !== v.state.doc.toString()) {
+    if (v && value.replace(/\r\n/g, '\n') !== v.state.doc.toString()) {
       v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: value } })
     }
   }, [value])
