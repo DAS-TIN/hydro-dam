@@ -262,6 +262,19 @@ export default function App() {
   const [seenUntracked, setSeenUntracked] = useState<string[]>([])
   const [seenIgnored, setSeenIgnored] = useState<string[]>([])
   const [fileDirty, setFileDirty] = useState(false)
+  // Unsaved edits per file path, so a tab keeps its draft when you switch away.
+  const [drafts, setDrafts] = useState<Record<string, string>>({})
+  const onDraftChange = useCallback((path: string, value: string | null) => {
+    setDrafts((d) => {
+      if (value === null) {
+        if (!(path in d)) return d
+        const next = { ...d }
+        delete next[path]
+        return next
+      }
+      return { ...d, [path]: value }
+    })
+  }, [])
   const [branches, setBranches] = useState<Branch[]>([])
   const [coauthors, setCoauthors] = useState<Coauthor[]>([])
 
@@ -2250,6 +2263,7 @@ export default function App() {
             <div className="flex shrink-0 items-stretch overflow-x-auto border-b border-ink-800 bg-ink-950">
               {tabs.map((t) => {
                 const active = activePath === t.path
+                const tabDirty = t.path in drafts || (active && fileDirty)
                 return (
                   <div
                     key={t.path}
@@ -2286,7 +2300,13 @@ export default function App() {
             </div>
           )}
           {mainTab === 'diff' && (previewPath ? (
-            <FilePreview cwd={cwd} path={previewPath} toast={(k, t) => toast(k, t)} />
+            <FilePreview
+              cwd={cwd}
+              path={previewPath}
+              toast={(k, t) => toast(k, t)}
+              savedDraft={drafts[previewPath]}
+              onDraftChange={onDraftChange}
+            />
           ) : sel ? (
             <>
               {/* wraps on narrow windows so the action buttons never clip away */}
@@ -2377,6 +2397,8 @@ export default function App() {
                     toast={(k, t) => toast(k, t)}
                     onSaved={() => refresh()}
                     onDirtyChange={setFileDirty}
+                    savedDraft={drafts[sel.file.path]}
+                    onDraftChange={onDraftChange}
                   />
                 ) : IMAGE_RE.test(sel.file.path) ? (
                   <ImageDiff

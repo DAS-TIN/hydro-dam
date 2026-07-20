@@ -6,11 +6,15 @@ import FileContent from './FileContent'
 export default function FilePreview({
   cwd,
   path,
-  toast
+  toast,
+  savedDraft,
+  onDraftChange
 }: {
   cwd: string
   path: string
   toast: (kind: 'ok' | 'err', text: string) => void
+  savedDraft?: string
+  onDraftChange?: (path: string, value: string | null) => void
 }) {
   const md = isMarkdown(path)
   const [view, setView] = useState<'code' | 'preview'>(md ? 'preview' : 'code')
@@ -65,6 +69,8 @@ export default function FilePreview({
           toast={toast}
           onLoaded={setInfo}
           onDirtyChange={setDirty}
+          savedDraft={savedDraft}
+          onDraftChange={onDraftChange}
         />
       </div>
     </>

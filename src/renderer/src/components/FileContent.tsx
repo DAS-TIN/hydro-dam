@@ -19,7 +19,9 @@ export default function FileContent({
   toast,
   onSaved,
   onLoaded,
-  onDirtyChange
+  onDirtyChange,
+  savedDraft,
+  onDraftChange
 }: {
   cwd: string
   path: string
@@ -29,6 +31,11 @@ export default function FileContent({
   onSaved?: () => void
   onLoaded?: (p: Preview) => void
   onDirtyChange?: (dirty: boolean) => void
+  // Draft persistence lives above this component (keyed by path) so unsaved edits
+  // survive switching tabs. savedDraft seeds the editor; onDraftChange reports the
+  // current text (null once it matches disk again).
+  savedDraft?: string
+  onDraftChange?: (path: string, value: string | null) => void
 }) {
   const [data, setData] = useState<Preview | null>(null)
   const [error, setError] = useState('')
@@ -36,8 +43,11 @@ export default function FileContent({
   const [saving, setSaving] = useState(false)
   const [diagnostics, setDiagnostics] = useState<LspDiagnostic[]>([])
 
+  // CodeMirror stores the document with LF line breaks, so compare against disk
+  // ignoring CRLF vs LF - otherwise a CRLF file looks edited the moment it opens.
+  const norm = (s: string) => s.replace(/\r\n/g, '\n')
   const active = !!editable && data?.kind === 'text'
-  const dirty = active && draft !== (data?.text ?? '')
+  const dirty = active && norm(draft) !== norm(data?.text ?? '')
 
   useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange])
 
@@ -75,7 +85,8 @@ export default function FileContent({
       .then((p) => {
         if (!live) return
         setData(p)
-        setDraft(p.text ?? '')
+        // Restore an unsaved draft for this path if the parent kept one.
+        setDraft(savedDraft ?? p.text ?? '')
         onLoaded?.(p)
       })
       .catch((e) => live && setError(e.message))
@@ -85,6 +96,13 @@ export default function FileContent({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cwd, path])
 
+  // Update the draft and tell the parent, reporting null once we're back to the
+  // on-disk text so clean files don't linger in the draft store.
+  const changeDraft = (v: string) => {
+    setDraft(v)
+    onDraftChange?.(path, norm(v) === norm(data?.text ?? '') ? null : v)
+  }
+
   const save = async () => {
     if (saving || !dirty) return
     setSaving(true)
@@ -92,6 +110,7 @@ export default function FileContent({
       await api().writeFile(cwd, path, draft)
       const fresh = await api().readFile(cwd, path)
       setData(fresh)
+      onDraftChange?.(path, null)
       onSaved?.()
     } catch (e: any) {
       toast?.('err', e?.message || String(e))
@@ -128,7 +147,7 @@ export default function FileContent({
       <div className="h-full min-h-0">
         <CodeEditor
           value={draft}
-          onChange={setDraft}
+          onChange={changeDraft}
           path={path}
           cwd={cwd}
           onSave={save}
